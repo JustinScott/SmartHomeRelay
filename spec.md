@@ -163,7 +163,7 @@ Rules for modules:
 | Purpose | Library |
 |---|---|
 | Hosting, DI, config, logging | `Microsoft.Extensions.Hosting` (Generic Host) |
-| MQTT | `MQTTnet`, using the plain `IMqttClient` with our own small reconnect supervisor (the prototype's managed client is not carried over; owning the loop makes suspend/resume explicit and testable) |
+| MQTT | `MQTTnet` v5, using the plain `IMqttClient` with our own small reconnect supervisor (the prototype's managed client is not carried over; owning the loop makes suspend/resume explicit and testable) |
 | Logging sink | `Serilog` (rolling file) via `Serilog.Extensions.Logging` |
 | Toast notifications | `CommunityToolkit.WinUI.Notifications` |
 | P/Invoke | `Microsoft.Windows.CsWin32` (source-generated) |
@@ -189,6 +189,8 @@ Package versions are pinned centrally in `Directory.Packages.props`.
 
 **Preserve:** the `shr/{host}/status` availability topic, the `commands/notification` command and its fields, hero image via temp file, the rebuild-client-after-resume approach, and the one-day toast expiration.
 
+**Do not run the prototype and the new app at the same time on the same PC.** Both publish to `shr/{host}/status`, so they would overwrite each other's availability, and the prototype's broken discovery can confuse HA.
+
 **Do not carry over (known defects in the prototype):**
 
 1. Clean MQTT disconnect on suspend without publishing `offline`, which leaves HA showing the PC as online while asleep.
@@ -207,8 +209,9 @@ Package versions are pinned centrally in `Directory.Packages.props`.
 ### 4.1 Identity
 
 - `deviceId`: the machine's host name by default (same as the prototype's `Dns.GetHostName()`, so existing topics keep working), configurable. Immutable once entities exist in HA (changing it creates new entities). A sanitized form is used inside `unique_id` values.
-- Entity `unique_id`: `{deviceId}_{entityKey}`.
-- All entities are grouped under one HA **device** (manufacturer, model "Windows PC", `sw_version` from assembly version, `identifiers: [deviceId]`).
+- Entity `unique_id`: `{sanitizedDeviceId}_{entityKey}`, where `sanitizedDeviceId` is the device ID lowercased with every character other than `a-z`, `0-9`, and `_` replaced by `_` (host `DESKTOP-ABC123` gives `desktop_abc123_cpu_usage`). Topics use the device ID exactly as configured. **This rule is permanent**: changing it orphans every HA entity.
+- All entities are grouped under one HA **device** (manufacturer `Smart Home Relay`, model `Windows PC`, `sw_version` from assembly version, `identifiers: [deviceId]`).
+- MQTT client ID: `shr-{deviceId}`.
 
 ### 4.2 Topics
 
@@ -258,8 +261,8 @@ Signals exposed: **session state** and **keyboard/mouse idle time** (per decisio
 
 | Entity | Type | Notes |
 |---|---|---|
-| `shutdown` | button | Optional delay setting (default 0s) |
-| `restart` | button | |
+| `shutdown` | button | Delayed by `shutdownDelaySeconds` (default 60s); Windows shows its standard shutdown countdown |
+| `restart` | button | Same delay as `shutdown` |
 | `sleep` | button | |
 | `hibernate` | button | Only offered if hibernation is enabled on the machine |
 | `lock` | button | `LockWorkStation` |
@@ -269,6 +272,8 @@ Signals exposed: **session state** and **keyboard/mouse idle time** (per decisio
 
 - Every command is behind an interface (`IPowerController`) so tests never actually shut anything down.
 - Shutdown, restart, hibernate, and sign-out are **disabled by default** and must be enabled in settings.
+- Sleep and lock are not destructive: they are available whenever the Power feature is enabled and have no separate toggle.
+- `shutdownDelaySeconds` (0 to 600, default 60) applies to both shutdown and restart. 0 means immediate.
 - Known caveat: `SetSuspendState` can hibernate instead of sleep on some configurations. Document and test the behavior on the target machine.
 
 ### 5.3 Display
@@ -354,7 +359,7 @@ Behavior rules:
 
 ### 5.7 Candidate features for later (not v1)
 
-Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state.
+Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state, editing `discoveryPrefix` and `baseTopic` in the settings window (an Advanced section with a warning that changing them breaks existing automations).
 
 ---
 
@@ -385,7 +390,9 @@ Notes:
 
 - File: `%APPDATA%\SmartHomeRelay\settings.json`. Created with defaults on first run.
 - Bound via the Options pattern; validated on load and on save (invalid values rejected with clear messages in the UI).
-- **MQTT password** is stored encrypted using DPAPI (`ProtectedData`, `CurrentUser` scope). Never logged, never written in plain text.
+- **MQTT password** is stored encrypted using DPAPI (`ProtectedData`, `CurrentUser` scope). Never logged. The app never writes it in plain text.
+- **Entering the password by hand:** the user may add `"password": "<plain text>"` under `mqtt`. When the app loads the file it encrypts the value into `passwordProtected` and rewrites the file without the plain-text field, so plain text exists only between the user saving and the app picking up the change. This is how the password is set until the settings window exists (milestone 9).
+- **First run:** when the app creates `settings.json`, it opens the file in the user's default editor for `.json` files (Notepad if there is none) and shows a tray balloon explaining what to fill in. Saved changes are applied without a restart.
 
 ```json
 {
@@ -401,7 +408,7 @@ Notes:
   "device": { "id": "desktop_main", "name": "Main Desktop" },
   "features": {
     "presence": { "enabled": true, "idleThresholdSeconds": 300 },
-    "power":    { "enabled": true, "allowShutdown": false, "allowRestart": false, "allowHibernate": false, "allowSignOut": false },
+    "power":    { "enabled": true, "allowShutdown": false, "allowRestart": false, "allowHibernate": false, "allowSignOut": false, "shutdownDelaySeconds": 60 },
     "display":  { "enabled": true },
     "audio":    { "enabled": true },
     "metrics":  { "enabled": true, "intervalSeconds": 30 },
@@ -446,8 +453,8 @@ Notes:
 |---|---|---|---|
 | Unit | `Core.Tests` | Module logic, state mapping, command handling, presence derivation, discovery payload generation, config validation, backoff logic, lifecycle orchestration using fake event sources | Every build, any OS |
 | Contract | `Core.Tests` | All registered modules: entity keys unique, discovery payloads valid, every command entity has a handler, disabled features clear their discovery | Every build |
-| Snapshot | `Core.Tests` | Discovery JSON for each entity compared against approved snapshots so accidental changes are caught | Every build |
-| Integration (MQTT) | `Core.Tests` (tagged) | Real broker (Mosquitto via Testcontainers or CI service): connect, LWT, discovery, command round trip, reconnect | CI, optional locally |
+| Snapshot | `Core.Tests` | Discovery JSON for each entity compared against approved JSON files checked into the repo, so accidental changes are caught | Every build |
+| Integration (MQTT) | `Core.Tests` (tagged `MqttBroker`) | Real Mosquitto broker: connect, LWT, discovery, command round trip, reconnect. Runs in a separate `ubuntu-latest` CI job with a Mosquitto service container, because Windows runners cannot run Linux containers | CI (Linux job), optional locally |
 | Integration (Windows) | `Platform.Tests` (tagged `Windows`) | Real implementations of idle time, audio, metrics against the actual OS. Never run destructive actions (shutdown, sleep) | CI on `windows-latest` |
 | Architecture | `Core.Tests` | `Core` has no references to Windows or WinForms assemblies | Every build |
 
@@ -467,7 +474,7 @@ Conventions:
 - Test naming: `Method_Scenario_ExpectedResult`.
 - Time and delays are injected (`TimeProvider`) so tests never use real sleeps.
 - Destructive platform actions are only ever exercised through fakes.
-- **CI** (GitHub Actions, `windows-latest`): restore, build with warnings-as-errors, run all tests, publish artifact. A failing test blocks merge. On a version tag, CI also builds the Inno Setup installer and attaches it to a GitHub Release.
+- **CI** (GitHub Actions): a `windows-latest` job restores, builds with warnings-as-errors, runs all tests except `MqttBroker`, and publishes the artifact; an `ubuntu-latest` job runs the `MqttBroker` tests against Mosquitto. A failing test blocks merge. On a version tag, CI also builds the Inno Setup installer and attaches it to a GitHub Release.
 
 ---
 
@@ -499,7 +506,7 @@ Conventions:
 ## 12. Security
 
 - v1 connects to the broker over **plain TCP with username/password authentication** (no TLS, matching the author's LAN setup). TLS support is deferred. The settings model keeps a `useTls` field (always `false` in v1) so TLS can be added later without breaking existing config files.
-- Credentials protected with DPAPI. No secrets in logs, in discovery payloads, or in the repo.
+- Credentials protected with DPAPI. No secrets in logs, in discovery payloads, or in the repo. A password typed into `settings.json` by hand is encrypted and removed from the file as soon as the app reads it (section 7).
 - The app only talks to the configured broker (plus HTTP(S) image downloads for notifications, with size and time limits).
 - **No credentials, IP addresses, or host names in source code** (the prototype hardcoded them). They live only in settings, with the password DPAPI-encrypted. Rotate any credential that was ever committed to source control.
 - Repository hygiene: enable GitHub secret scanning and push protection. `settings.json` lives in `%APPDATA%`, outside the repo, so it cannot be committed by accident.
@@ -535,7 +542,7 @@ Conventions:
 ## 14. Milestones
 
 1. **Skeleton:** solution layout, Generic Host, DI, config, logging, tray icon, single-instance, CI pipeline.
-2. **MQTT core:** connection, LWT/availability, reconnect, discovery builder, entity abstractions, contract and snapshot tests.
+2. **MQTT core:** connection, LWT/availability, reconnect, discovery builder, entity abstractions, contract and snapshot tests, Linux CI job with Mosquitto. Also: first-run opening of `settings.json` and encryption of a hand-entered password (section 7).
 3. **Lifecycle:** suspend/resume/session/network handling with fake event source tests, then real implementation.
 4. **Presence** module.
 5. **Power** module.
@@ -564,6 +571,12 @@ Conventions:
 - Tray menu grows per milestone; no disabled placeholder items (milestone 1).
 - `logLevel` added to `settings.json` (section 7) to back the General > log level option (milestone 1).
 - Tests use xUnit v3 and Shouldly.
+- HA device manufacturer is `Smart Home Relay`.
+- `unique_id` uses the lowercased, underscore-sanitized device ID (section 4.1).
+- Shutdown and restart wait `shutdownDelaySeconds` (default 60s). Sleep and lock have no toggle.
+- Until milestone 9, settings are edited in `settings.json` directly: it opens on first run, and a plain `password` field is encrypted automatically.
+- The settings window stays in milestone 9. Editable topic settings are a later enhancement (5.7).
+- MQTT broker integration tests run in a Linux CI job.
 
 **Open**
 

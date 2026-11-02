@@ -23,7 +23,7 @@ public sealed class SettingsBindingTests : IDisposable
           "device": { "id": "desktop_main", "name": "Main Desktop" },
           "features": {
             "presence": { "enabled": true, "idleThresholdSeconds": 300 },
-            "power":    { "enabled": true, "allowShutdown": false, "allowRestart": false, "allowHibernate": false, "allowSignOut": false },
+            "power":    { "enabled": true, "allowShutdown": false, "allowRestart": false, "allowHibernate": false, "allowSignOut": false, "shutdownDelaySeconds": 90 },
             "display":  { "enabled": true },
             "audio":    { "enabled": false },
             "metrics":  { "enabled": true, "intervalSeconds": 45 },
@@ -58,6 +58,7 @@ public sealed class SettingsBindingTests : IDisposable
         settings.Features.Presence.Enabled.ShouldBeTrue();
         settings.Features.Presence.IdleThresholdSeconds.ShouldBe(300);
         settings.Features.Power.AllowShutdown.ShouldBeFalse();
+        settings.Features.Power.ShutdownDelaySeconds.ShouldBe(90);
         settings.Features.Audio.Enabled.ShouldBeFalse();
         settings.Features.Metrics.IntervalSeconds.ShouldBe(45);
         settings.Features.Notifications.ImageMaxBytes.ShouldBe(10_485_760);
@@ -89,6 +90,7 @@ public sealed class SettingsBindingTests : IDisposable
         settings.Device.Name.ShouldBe(SettingsTestContext.HostName);
         settings.Features.Presence.IdleThresholdSeconds.ShouldBe(300);
         settings.Features.Metrics.IntervalSeconds.ShouldBe(30);
+        settings.Features.Power.ShutdownDelaySeconds.ShouldBe(60);
         settings.Features.Notifications.ImageDownloadTimeoutSeconds.ShouldBe(10);
         settings.LogLevel.ShouldBe(LogLevel.Information);
     }

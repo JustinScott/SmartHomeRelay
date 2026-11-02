@@ -148,6 +148,28 @@ public sealed class SettingsValidatorTests
     }
 
     [Theory]
+    [InlineData(-1)]
+    [InlineData(601)]
+    public void Validate_ShutdownDelayOutOfRange_ReturnsError(int seconds)
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Power.ShutdownDelaySeconds = seconds;
+
+        ShouldHaveSingleErrorFor(settings, "features.power.shutdownDelaySeconds");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(600)]
+    public void Validate_ShutdownDelayAtBounds_ReturnsNoErrors(int seconds)
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Power.ShutdownDelaySeconds = seconds;
+
+        _validator.Validate(settings).ShouldBeEmpty();
+    }
+
+    [Theory]
     [InlineData(4)]
     [InlineData(3_601)]
     public void Validate_MetricsIntervalOutOfRange_ReturnsError(int seconds)

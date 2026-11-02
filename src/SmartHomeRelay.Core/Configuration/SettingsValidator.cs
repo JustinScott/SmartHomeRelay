@@ -15,6 +15,7 @@ public sealed class SettingsValidator
     internal const int MinImageTimeoutSeconds = 1;
     internal const int MaxImageTimeoutSeconds = 120;
     internal const long MaxImageMaxBytes = 100L * 1024 * 1024;
+    internal const int MaxShutdownDelaySeconds = 600;
 
     private static readonly char[] s_topicWildcards = ['+', '#'];
 
@@ -83,6 +84,13 @@ public sealed class SettingsValidator
             features.Presence.IdleThresholdSeconds,
             MinIdleThresholdSeconds,
             MaxIdleThresholdSeconds,
+            errors);
+
+        ValidateRange(
+            "features.power.shutdownDelaySeconds",
+            features.Power.ShutdownDelaySeconds,
+            0,
+            MaxShutdownDelaySeconds,
             errors);
 
         ValidateRange(

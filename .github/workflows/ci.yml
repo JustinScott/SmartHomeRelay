@@ -30,7 +30,7 @@ jobs:
         run: dotnet build SmartHomeRelay.sln --configuration Release --no-restore -warnaserror
 
       - name: Test (unit + Windows integration)
-        run: dotnet test SmartHomeRelay.sln --configuration Release --no-build --logger trx --results-directory TestResults
+        run: dotnet test SmartHomeRelay.sln --configuration Release --no-build --filter "Category!=MqttBroker" --logger trx --results-directory TestResults
 
       - name: Upload test results
         if: always()

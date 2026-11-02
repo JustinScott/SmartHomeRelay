@@ -50,7 +50,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
             ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("presence")).ShouldBe(["enabled", "idleThresholdSeconds"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("power")).ShouldBe(
-            ["enabled", "allowShutdown", "allowRestart", "allowHibernate", "allowSignOut"],
+            ["enabled", "allowShutdown", "allowRestart", "allowHibernate", "allowSignOut", "shutdownDelaySeconds"],
             ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("metrics")).ShouldBe(["enabled", "intervalSeconds"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("notifications")).ShouldBe(
@@ -70,6 +70,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         power.GetProperty("allowRestart").GetBoolean().ShouldBeFalse();
         power.GetProperty("allowHibernate").GetBoolean().ShouldBeFalse();
         power.GetProperty("allowSignOut").GetBoolean().ShouldBeFalse();
+        power.GetProperty("shutdownDelaySeconds").GetInt32().ShouldBe(60);
     }
 
     [Fact]

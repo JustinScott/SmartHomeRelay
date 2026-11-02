@@ -50,11 +50,12 @@ Once the solution exists (adjust if paths differ):
 
 ```
 dotnet build SmartHomeRelay.sln -warnaserror
-dotnet test SmartHomeRelay.sln --filter "Category!=Windows"
-dotnet test SmartHomeRelay.sln
+dotnet test SmartHomeRelay.sln --filter "Category!=Windows&Category!=MqttBroker"
+dotnet test SmartHomeRelay.sln --filter "Category!=MqttBroker"
+dotnet test SmartHomeRelay.sln --filter "Category=MqttBroker"
 ```
 
-The second command runs the fast unit tests. The third includes Windows-only integration tests.
+The second command runs the fast unit tests. The third adds the Windows-only integration tests. The fourth needs a running Mosquitto broker (CI runs it in a Linux job).
 
 ## Out of scope for v1
 

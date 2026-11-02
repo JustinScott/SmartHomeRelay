@@ -14,4 +14,9 @@ public sealed class PowerSettings : FeatureToggle
 
     /// <summary>Allow the <c>sign_out</c> command.</summary>
     public bool AllowSignOut { get; set; }
+
+    /// <summary>
+    /// Delay before shutdown and restart, during which Windows shows its countdown. 0 means immediate.
+    /// </summary>
+    public int ShutdownDelaySeconds { get; set; } = 60;
 }
