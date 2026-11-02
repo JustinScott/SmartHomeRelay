@@ -1,0 +1,34 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace SmartHomeRelay.Core.Configuration;
+
+/// <summary>DI registration for settings.</summary>
+public static class SettingsServiceCollectionExtensions
+{
+    /// <summary>
+    /// Binds <see cref="AppSettings"/> to <paramref name="configuration"/> and registers validation,
+    /// the store, <see cref="ISettingsState"/>, and first-run file creation.
+    /// Requires an <see cref="Abstractions.IHostNameProvider"/> and <see cref="Abstractions.IAppPaths"/>.
+    /// </summary>
+    public static IServiceCollection AddRelaySettings(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.AddOptions<AppSettings>().Bind(configuration);
+        services.AddSingleton<DeviceDefaultsPostConfigure>();
+        services.AddSingleton<IPostConfigureOptions<AppSettings>>(sp => sp.GetRequiredService<DeviceDefaultsPostConfigure>());
+        services.AddSingleton<SettingsValidator>();
+        services.AddSingleton<ISettingsStore, JsonSettingsStore>();
+        services.AddSingleton<SettingsState>();
+        services.AddSingleton<ISettingsState>(sp => sp.GetRequiredService<SettingsState>());
+
+        // Order matters: the state is evaluated before the initializer decides whether to write defaults.
+        services.AddHostedService(sp => sp.GetRequiredService<SettingsState>());
+        services.AddHostedService<SettingsFileInitializer>();
+
+        return services;
+    }
+}

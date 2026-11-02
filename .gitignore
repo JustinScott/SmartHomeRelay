@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+TestResults/
+*.binlog
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+# Installer output
+installer/Output/
+
+# Never commit local settings or secrets (settings.json normally lives in %APPDATA%)
+settings.json
+*.pfx

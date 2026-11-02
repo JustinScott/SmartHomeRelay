@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- WinForms tray app and composition root. No business logic here (spec 3.2). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <RootNamespace>SmartHomeRelay.App</RootNamespace>
+    <AssemblyName>SmartHomeRelay</AssemblyName>
+    <ApplicationIcon>Resources\SmartHomeRelay.ico</ApplicationIcon>
+    <!-- x64 only (spec 8). The RuntimeIdentifier is supplied at publish time. -->
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartHomeRelay.Core\SmartHomeRelay.Core.csproj" />
+    <ProjectReference Include="..\SmartHomeRelay.Platform.Windows\SmartHomeRelay.Platform.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\SmartHomeRelay.ico" LogicalName="SmartHomeRelay.ico" />
+  </ItemGroup>
+
+</Project>

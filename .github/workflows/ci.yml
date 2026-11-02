@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore SmartHomeRelay.sln
+
+      - name: Build (warnings as errors)
+        run: dotnet build SmartHomeRelay.sln --configuration Release --no-restore -warnaserror
+
+      - name: Test (unit + Windows integration)
+        run: dotnet test SmartHomeRelay.sln --configuration Release --no-build --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
+
+      - name: Publish (self-contained win-x64)
+        run: dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj --configuration Release --runtime win-x64 --self-contained true --output publish
+
+      - name: Upload app
+        uses: actions/upload-artifact@v5
+        with:
+          name: SmartHomeRelay-win-x64
+          path: publish
