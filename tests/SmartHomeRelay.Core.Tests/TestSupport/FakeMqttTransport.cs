@@ -26,6 +26,12 @@ internal sealed class FakeMqttTransport : IMqttTransport
 
     public int DisconnectCount { get; private set; }
 
+    /// <summary>Connect attempts wait until cancelled, like an unreachable broker before its timeout.</summary>
+    public bool HangConnects { get; set; }
+
+    /// <summary>Publishes wait until cancelled, like a stalled network.</summary>
+    public bool HangPublishes { get; set; }
+
     public void FailNextConnects(int count, Exception? exception = null)
     {
         for (var i = 0; i < count; i++)
@@ -34,29 +40,37 @@ internal sealed class FakeMqttTransport : IMqttTransport
         }
     }
 
-    public Task ConnectAsync(MqttConnectionOptions options, CancellationToken cancellationToken)
+    public async Task ConnectAsync(MqttConnectionOptions options, CancellationToken cancellationToken)
     {
         ConnectAttempts.Enqueue(options);
         Calls.Enqueue("connect");
+        if (HangConnects)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
         if (_connectFailures.TryDequeue(out var failure))
         {
             throw failure;
         }
 
         _connected = true;
-        return Task.CompletedTask;
     }
 
-    public Task PublishAsync(string topic, string payload, MqttQos qos, bool retain, CancellationToken cancellationToken)
+    public async Task PublishAsync(string topic, string payload, MqttQos qos, bool retain, CancellationToken cancellationToken)
     {
         if (!_connected)
         {
             throw new InvalidOperationException("Not connected.");
         }
 
+        if (HangPublishes)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
         Calls.Enqueue($"publish {topic} {payload}");
         Publications.Enqueue(new Published(topic, payload, qos, retain));
-        return Task.CompletedTask;
     }
 
     public Task SubscribeAsync(IReadOnlyCollection<string> topics, CancellationToken cancellationToken)
@@ -76,6 +90,12 @@ internal sealed class FakeMqttTransport : IMqttTransport
         DisconnectCount++;
         _connected = false;
         return Task.CompletedTask;
+    }
+
+    public void Abort()
+    {
+        Calls.Enqueue("abort");
+        _connected = false;
     }
 
     /// <summary>Simulates the broker or network dropping the connection.</summary>

@@ -23,4 +23,7 @@ public enum RelayStatus
 
     /// <summary>Cannot connect until the user fixes something, e.g. the password cannot be decrypted.</summary>
     Error,
+
+    /// <summary>Offline on purpose: the system is going to sleep or shutting down (spec 6).</summary>
+    Suspended,
 }

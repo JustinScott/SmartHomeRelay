@@ -16,6 +16,7 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -30,7 +31,7 @@ jobs:
         run: dotnet build SmartHomeRelay.sln --configuration Release --no-restore -warnaserror
 
       - name: Test (unit + Windows integration)
-        run: dotnet test SmartHomeRelay.sln --configuration Release --no-build --filter "Category!=MqttBroker" --logger trx --results-directory TestResults
+        run: dotnet test SmartHomeRelay.sln --configuration Release --no-build --filter "Category!=MqttBroker" --blame-hang-timeout 2m --logger trx --results-directory TestResults
 
       - name: Upload test results
         if: always()
@@ -53,6 +54,7 @@ jobs:
   # Core is cross-platform, so its tests run unchanged on Linux.
   mqtt-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -70,4 +72,4 @@ jobs:
         env:
           # A missing broker fails the job instead of silently skipping the tests.
           SHR_REQUIRE_MQTT_BROKER: "1"
-        run: dotnet test tests/SmartHomeRelay.Core.Tests/SmartHomeRelay.Core.Tests.csproj --configuration Release --filter "Category=MqttBroker"
+        run: dotnet test tests/SmartHomeRelay.Core.Tests/SmartHomeRelay.Core.Tests.csproj --configuration Release --filter "Category=MqttBroker" --blame-hang-timeout 2m

@@ -8,7 +8,7 @@ namespace SmartHomeRelay.Core.Hosting;
 public static class RelayServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the transport, reconnect supervisor, and <see cref="ModuleHost"/>. Feature modules are
+    /// Registers the transport, reconnect supervisor, <see cref="ModuleHost"/>, and <see cref="LifecycleCoordinator"/>. Feature modules are
     /// registered separately as <see cref="Features.IFeatureModule"/> (one line each, spec 13).
     /// </summary>
     public static IServiceCollection AddRelayMqtt(this IServiceCollection services)
@@ -30,6 +30,10 @@ public static class RelayServiceCollectionExtensions
         // publishes offline and closes before modules are torn down.
         services.AddHostedService(sp => sp.GetRequiredService<ModuleHost>());
         services.AddHostedService(sp => sp.GetRequiredService<MqttConnectionSupervisor>());
+
+        // Needs an ISystemEventSource from the platform. Starts last, so suspend/resume events only
+        // arrive once the connection and modules are running.
+        services.AddHostedService<LifecycleCoordinator>();
 
         return services;
     }

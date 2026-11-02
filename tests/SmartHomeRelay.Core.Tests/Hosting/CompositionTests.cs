@@ -33,6 +33,8 @@ public sealed class CompositionTests : IDisposable
         services.AddSingleton<IShellLauncher>(new FakeShellLauncher());
         services.AddSingleton<IUserNotifier>(new FakeUserNotifier());
         services.AddSingleton<ISecretProtector>(new FakeSecretProtector());
+        services.AddSingleton<ISystemEventSource>(new FakeSystemEventSource());
+        services.AddSingleton<IHostApplicationLifetime>(new FakeApplicationLifetime());
         services.AddRelaySettings((IConfiguration)configuration);
         services.AddRelayMqtt();
 
@@ -46,6 +48,7 @@ public sealed class CompositionTests : IDisposable
             typeof(PlainPasswordEncryptor),
             typeof(ModuleHost),
             typeof(MqttConnectionSupervisor),
+            typeof(LifecycleCoordinator),
         ]);
         provider.GetRequiredService<IRelayStatusSource>().ShouldBeSameAs(provider.GetRequiredService<MqttConnectionSupervisor>());
         provider.GetRequiredService<IReconnectRequester>().ShouldBeSameAs(provider.GetRequiredService<MqttConnectionSupervisor>());

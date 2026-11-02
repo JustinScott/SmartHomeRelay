@@ -31,6 +31,9 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     private TaskCompletionSource _disconnected = NewSignal();
     private string _activeFingerprint = string.Empty;
     private MqttTopics? _connectedTopics;
+    private TaskCompletionSource _suspendAcknowledged = NewSignal();
+    private CancellationTokenSource? _attempt;
+    private volatile bool _suspended;
     private volatile RelayStatus _status = RelayStatus.Disconnected;
     private Task? _loop;
 
@@ -93,6 +96,49 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     }
 
     /// <summary>
+    /// Goes offline and stays offline until <see cref="Resume"/> (spec 6: suspend and shutdown). Publishes
+    /// <c>offline</c> before disconnecting, because a clean disconnect does not trigger the last will.
+    /// Completes once offline (or when <paramref name="cancellationToken"/> fires; the last will then covers it).
+    /// </summary>
+    public async Task SuspendAsync(CancellationToken cancellationToken)
+    {
+        var acknowledged = NewSignal();
+        Volatile.Write(ref _suspendAcknowledged, acknowledged);
+        _suspended = true;
+        LogSuspending(_logger);
+
+        // Abort a connection attempt in progress so it can't come online after we went offline.
+        CancelAttempt();
+        _wake.Writer.TryWrite(true);
+
+        await acknowledged.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Leaves the suspended state and connects again right away. Also forces a fresh connection when not
+    /// suspended (a missed suspend, e.g. Modern Standby), because the old one is probably dead.
+    /// </summary>
+    public void Resume()
+    {
+        LogResuming(_logger);
+        _suspended = false;
+        _wake.Writer.TryWrite(true);
+    }
+
+    /// <summary>
+    /// A network became available. If we are waiting to retry, retry now instead of waiting out the backoff.
+    /// Ignored while connected or suspended.
+    /// </summary>
+    public void NotifyNetworkAvailable()
+    {
+        if (!_suspended && !_transport.IsConnected)
+        {
+            LogNetworkAvailable(_logger);
+            _wake.Writer.TryWrite(true);
+        }
+    }
+
+    /// <summary>
     /// Synchronous dispose (e.g. a container disposed with Dispose): stops the loop without waiting.
     /// Normal shutdown goes through <see cref="StopAsync"/>, which publishes offline first.
     /// </summary>
@@ -119,6 +165,15 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
             {
                 try
                 {
+                    if (_suspended)
+                    {
+                        SetStatus(RelayStatus.Suspended);
+                        Volatile.Read(ref _suspendAcknowledged).TrySetResult();
+                        await WaitForWakeAsync(delay: null, stopping).ConfigureAwait(false);
+                        attempt = 0;
+                        continue;
+                    }
+
                     var snapshot = _settings.Current;
                     Volatile.Write(ref _activeFingerprint, Fingerprint(snapshot));
 
@@ -158,7 +213,26 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
                     try
                     {
                         LogConnecting(_logger, options.ToString());
-                        await _transport.ConnectAsync(options, stopping).ConfigureAwait(false);
+                        using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+                        Volatile.Write(ref _attempt, attemptCts);
+                        if (_suspended)
+                        {
+                            continue; // Suspended between the check above and here.
+                        }
+
+                        try
+                        {
+                            await _transport.ConnectAsync(options, attemptCts.Token).ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            Volatile.Write(ref _attempt, null);
+                        }
+                    }
+                    catch (Exception) when (!stopping.IsCancellationRequested && _suspended)
+                    {
+                        // The attempt was cancelled by SuspendAsync; the loop top acknowledges the suspend.
+                        continue;
                     }
                     catch (Exception ex) when (!stopping.IsCancellationRequested)
                     {
@@ -185,6 +259,13 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
 
                     attempt = 0;
                     Volatile.Write(ref _connectedTopics, topics);
+                    if (_suspended)
+                    {
+                        // Suspended just as the connection completed: never announce online.
+                        await GoOfflineAsync(topics).ConfigureAwait(false);
+                        continue;
+                    }
+
                     await OnConnectedAsync(topics, settings, stopping).ConfigureAwait(false);
 
                     var dropped = await WaitForDisconnectOrWakeAsync(disconnected.Task, stopping).ConfigureAwait(false);
@@ -198,7 +279,8 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
                         continue;
                     }
 
-                    // Woken by a settings change or a reconnect request: leave cleanly, then loop.
+                    // Woken by a settings change, a reconnect request, a resume, or a suspend: leave cleanly
+                    // (offline first), then loop. The loop top handles the suspended state.
                     await GoOfflineAsync(topics).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (!stopping.IsCancellationRequested)
@@ -261,8 +343,11 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
         }
         catch (Exception ex)
         {
-            // Best effort: if this fails, the broker publishes the last will (offline) when the socket drops.
+            // The polite goodbye failed (e.g. a stalled network). Drop the connection instead: the broker
+            // sees the socket close and publishes the last will (offline) right away. Leaving it open
+            // would keep the PC "online" until the broker's keep-alive timeout.
             LogGoOfflineFailed(_logger, ex);
+            _transport.Abort();
         }
     }
 
@@ -365,6 +450,18 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
             s.Device.Name);
     }
 
+    private void CancelAttempt()
+    {
+        try
+        {
+            Volatile.Read(ref _attempt)?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The attempt just finished.
+        }
+    }
+
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Connecting to MQTT broker {Endpoint}")]
@@ -391,7 +488,7 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     [LoggerMessage(Level = LogLevel.Information, Message = "Published offline and disconnected")]
     private static partial void LogDisconnected(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not publish offline before disconnecting; the broker's last will covers it")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not publish offline before disconnecting; dropped the connection so the broker's last will reports offline")]
     private static partial void LogGoOfflineFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "mqtt.passwordProtected in settings.json is not a password encrypted by this app for this Windows user. Type the password into mqtt.password instead (it is encrypted automatically) and clear passwordProtected")]
@@ -399,6 +496,15 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Connection settings changed; reconnecting")]
     private static partial void LogSettingsChangedReconnect(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "System is suspending or shutting down; going offline")]
+    private static partial void LogSuspending(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "System resumed; reconnecting")]
+    private static partial void LogResuming(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Network available; retrying the connection now")]
+    private static partial void LogNetworkAvailable(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Reconnect requested")]
     private static partial void LogReconnectRequested(ILogger logger);

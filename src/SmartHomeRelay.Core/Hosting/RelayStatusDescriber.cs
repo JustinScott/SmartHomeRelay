@@ -30,6 +30,7 @@ public static class RelayStatusDescriber
         RelayStatus.Connected => "Connected",
         RelayStatus.Reconnecting => "Reconnecting",
         RelayStatus.Error => "Connection error (see log)",
+        RelayStatus.Suspended => "Paused (system sleeping)",
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown status."),
     };
 

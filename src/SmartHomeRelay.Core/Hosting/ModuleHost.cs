@@ -110,6 +110,14 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         await PublishDiscoveryAndStateAsync(session, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Tells running <see cref="IPowerAware"/> modules the system is about to sleep (spec 3.3, 6).</summary>
+    public Task NotifySuspendingAsync(CancellationToken cancellationToken) =>
+        NotifyPowerAwareAsync((m, ct) => m.OnSuspendingAsync(ct), "suspend", cancellationToken);
+
+    /// <summary>Tells running <see cref="IPowerAware"/> modules the system woke up.</summary>
+    public Task NotifyResumedAsync(CancellationToken cancellationToken) =>
+        NotifyPowerAwareAsync((m, ct) => m.OnResumedAsync(ct), "resume", cancellationToken);
+
     /// <summary>Waits for outstanding background work (commands, republishes). For tests.</summary>
     internal Task WhenBackgroundIdleAsync() => Task.WhenAll(_background.Values);
 
@@ -294,6 +302,37 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         }
     }
 
+    private async Task NotifyPowerAwareAsync(Func<IPowerAware, CancellationToken, Task> call, string transition, CancellationToken cancellationToken)
+    {
+        List<IFeatureModule> running;
+        await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            running = [.. _catalog.Modules.Where(m => _running.Contains(m.Id))];
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+
+        // In parallel: the suspend budget is shared, so one slow module must not use it all up.
+        await Task.WhenAll(running.OfType<IPowerAware>().Select(async module =>
+        {
+            try
+            {
+                await call(module, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                LogPowerTransitionFailed(_logger, ex, ((IFeatureModule)module).Id, transition);
+            }
+            catch (OperationCanceledException)
+            {
+                // Out of time; the transition continues without this module.
+            }
+        })).ConfigureAwait(false);
+    }
+
     private bool IsEnabled(IFeatureModule module, AppSettings settings)
     {
         try
@@ -392,6 +431,9 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Command for {EntityKey} failed")]
     private static partial void LogCommandFailed(ILogger logger, Exception exception, string entityKey);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Module {ModuleId} failed to handle {Transition}; other modules are unaffected")]
+    private static partial void LogPowerTransitionFailed(ILogger logger, Exception exception, string moduleId, string transition);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Background work failed")]
     private static partial void LogBackgroundWorkFailed(ILogger logger, Exception exception);

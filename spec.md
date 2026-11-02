@@ -388,6 +388,17 @@ This is the most failure-prone area. Behavior is defined explicitly:
 | Settings changed | Settings window | Apply without restart: restart MQTT connection and add/remove modules as needed. |
 | Unhandled exception | Global handlers | Log. Keep the app alive where safe. Never leave a ghost tray icon (dispose `NotifyIcon` on exit). |
 
+How it is built (milestone 3):
+
+- `ISystemEventSource` (Core/Abstractions) delivers suspend, resume, session ending, session switch, and network availability. `WindowsSystemEventSource` (Platform.Windows) implements it over `SystemEvents` and `NetworkChange`; `LifecycleCoordinator` (Core/Hosting) holds all the decisions.
+- **Suspend and session ending use a deferral:** handlers register their work and the Windows event handler waits for it, up to 2 seconds, before letting Windows continue. This is the only place the app blocks a thread, and only because Windows proceeds as soon as the handler returns.
+- **Suspend:** publish `offline`, disconnect, then notify `IPowerAware` modules (in parallel), all within the 2-second budget. The connection then stays down (tray: *Paused*) until resume; no reconnect attempts while asleep. A connection attempt in progress is cancelled and never announces `online`.
+- **If `offline` cannot be published in time** (e.g. a stalled network), the connection is dropped without a goodbye, so the broker sees the socket close and publishes the last will immediately. It is never left half-open.
+- **Resume:** notify `IPowerAware` modules first, then reconnect immediately (no backoff delay), republishing `online`, discovery, and full state. A resume without a preceding suspend (e.g. a missed Modern Standby event) also forces a fresh connection.
+- **Network available:** if a reconnect is waiting out its backoff, retry now. Ignored while connected or suspended. Losing the network needs no action: the MQTT keep-alive detects it and the normal reconnect takes over.
+- **Shutdown / sign-out:** publish `offline`, disconnect, then exit the app. If the user cancels the shutdown, the app has already exited and must be started again (an accepted trade-off; the next sign-in starts it automatically).
+- **Lock / unlock:** delivered to the coordinator and logged; the Presence module (milestone 4) consumes them.
+
 Notes:
 
 - On Modern Standby (S0 low-power) systems, the process may keep running while the display is off. Timers may be throttled. State publishing must tolerate gaps and not assume a continuous tick.
@@ -592,4 +603,5 @@ Conventions:
 
 **Open**
 
+- [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.

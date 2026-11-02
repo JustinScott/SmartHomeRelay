@@ -25,6 +25,12 @@ public interface IMqttTransport : IAsyncDisposable, IDisposable
     Task SubscribeAsync(IReadOnlyCollection<string> topics, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Drops the connection without a DISCONNECT packet, so the broker publishes the last will. Used when a
+    /// clean goodbye fails. Never throws; the transport can connect again afterwards.
+    /// </summary>
+    void Abort();
+
+    /// <summary>
     /// Disconnects cleanly. A clean disconnect does <b>not</b> send the last will, so callers must publish
     /// <c>offline</c> first (spec 6).
     /// </summary>

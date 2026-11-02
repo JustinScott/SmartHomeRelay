@@ -129,6 +129,9 @@ public sealed class MqttNetTransport : IMqttTransport
     }
 
     /// <inheritdoc />
+    public void Abort() => DisposeClient();
+
+    /// <inheritdoc />
     public void Dispose() => DisposeClient();
 
     /// <inheritdoc />
