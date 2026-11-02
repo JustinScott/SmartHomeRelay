@@ -23,7 +23,12 @@ listener 1884
 allow_anonymous false
 password_file $dir/passwd
 CONF
-mosquitto -c "$dir/auth.conf" -d
+
+# Newer Ubuntu (26.04+, the current ubuntu-latest runner) ships an AppArmor profile that only lets
+# /usr/sbin/mosquitto read files under /etc/mosquitto. AppArmor profiles attach by program path, so a
+# copy of the binary in our temp folder can read the config above. No sudo or system config changes.
+cp "$(command -v mosquitto)" "$dir/mosquitto"
+"$dir/mosquitto" -c "$dir/auth.conf" -d
 
 # Wait until both answer.
 for port in 1883 1884; do

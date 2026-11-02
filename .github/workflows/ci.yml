@@ -34,7 +34,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: TestResults
@@ -44,7 +44,7 @@ jobs:
         run: dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj --configuration Release --runtime win-x64 --self-contained true --output publish
 
       - name: Upload app
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: SmartHomeRelay-win-x64
           path: publish
