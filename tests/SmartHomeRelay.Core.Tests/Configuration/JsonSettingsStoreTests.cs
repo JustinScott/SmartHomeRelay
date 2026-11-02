@@ -42,8 +42,8 @@ public sealed class JsonSettingsStoreTests : IDisposable
 
         PropertyNames(root).ShouldBe(["mqtt", "device", "features", "startWithWindows", "logLevel"], ignoreOrder: true);
         PropertyNames(root.GetProperty("mqtt")).ShouldBe(
-            ["host", "port", "useTls", "username", "passwordProtected", "discoveryPrefix", "baseTopic"],
-            ignoreOrder: true);
+            ["host", "port", "useTls", "username", "password", "passwordProtected", "discoveryPrefix", "baseTopic"],
+            ignoreOrder: false);
         PropertyNames(root.GetProperty("device")).ShouldBe(["id", "name"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features")).ShouldBe(
             ["presence", "power", "display", "audio", "metrics", "notifications"],
@@ -57,6 +57,25 @@ public sealed class JsonSettingsStoreTests : IDisposable
             ["enabled", "imageDownloadTimeoutSeconds", "imageMaxBytes"],
             ignoreOrder: true);
         root.GetProperty("logLevel").GetString().ShouldBe("Information");
+    }
+
+    [Fact]
+    public async Task SaveAsync_PlainPassword_IsWrittenAsEmptyPlaceholderOnly()
+    {
+        // Regression: without a visible "password" field, users typed their password into
+        // passwordProtected, which only holds encrypted values, and the app could not connect.
+        var settings = TestSettings.Valid();
+        settings.Mqtt.Password = "hunter2";
+        settings.Mqtt.PasswordProtected = "enc:abc";
+
+        await _store.SaveAsync(settings, TestContext.Current.CancellationToken);
+
+        var text = await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken);
+        text.ShouldNotContain("hunter2");
+        using var document = JsonDocument.Parse(text);
+        var mqtt = document.RootElement.GetProperty("mqtt");
+        mqtt.GetProperty("password").GetString().ShouldBe(string.Empty);
+        mqtt.GetProperty("passwordProtected").GetString().ShouldBe("enc:abc");
     }
 
     [Fact]

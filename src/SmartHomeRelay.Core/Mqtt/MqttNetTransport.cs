@@ -73,8 +73,16 @@ public sealed class MqttNetTransport : IMqttTransport
             _disconnectedHandler = DisconnectedHandler;
         }
 
-        // Throws MqttConnectingFailedException (e.g. bad credentials) or a socket/timeout exception.
-        await client.ConnectAsync(builder.Build(), cancellationToken).ConfigureAwait(false);
+        // Throws for socket and timeout failures. A refusal by the broker (e.g. bad credentials) does NOT
+        // throw in MQTTnet v5; it comes back as a result code, so it must be checked here.
+        var result = await client.ConnectAsync(builder.Build(), cancellationToken).ConfigureAwait(false);
+        if (result.ResultCode != MqttClientConnectResultCode.Success || !client.IsConnected)
+        {
+            DisposeClient();
+            var isAuthenticationFailure = result.ResultCode is MqttClientConnectResultCode.BadUserNameOrPassword
+                or MqttClientConnectResultCode.NotAuthorized;
+            throw new MqttConnectionRefusedException(result.ResultCode.ToString(), isAuthenticationFailure);
+        }
     }
 
     /// <inheritdoc />

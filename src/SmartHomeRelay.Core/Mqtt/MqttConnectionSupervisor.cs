@@ -30,6 +30,7 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     private readonly CancellationTokenSource _stopping = new();
     private TaskCompletionSource _disconnected = NewSignal();
     private string _activeFingerprint = string.Empty;
+    private MqttTopics? _connectedTopics;
     private volatile RelayStatus _status = RelayStatus.Disconnected;
     private Task? _loop;
 
@@ -116,87 +117,112 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
         {
             while (!stopping.IsCancellationRequested)
             {
-                var snapshot = _settings.Current;
-                Volatile.Write(ref _activeFingerprint, Fingerprint(snapshot));
-
-                var settingsStatus = RelayStatusDescriber.FromSettings(snapshot);
-                if (settingsStatus != RelayStatus.Disconnected)
-                {
-                    SetStatus(settingsStatus);
-                    await WaitForWakeAsync(delay: null, stopping).ConfigureAwait(false);
-                    attempt = 0;
-                    continue;
-                }
-
-                var settings = snapshot.Settings;
-                if (!TryGetPassword(settings.Mqtt, out var password))
-                {
-                    SetStatus(RelayStatus.Error);
-                    await WaitForWakeAsync(delay: null, stopping).ConfigureAwait(false);
-                    attempt = 0;
-                    continue;
-                }
-
-                var topics = new MqttTopics(settings.Mqtt, settings.Device);
-                var options = new MqttConnectionOptions
-                {
-                    Host = settings.Mqtt.Host,
-                    Port = settings.Mqtt.Port,
-                    ClientId = $"shr-{settings.Device.Id}",
-                    Username = string.IsNullOrEmpty(settings.Mqtt.Username) ? null : settings.Mqtt.Username,
-                    Password = password,
-                    WillTopic = topics.Availability,
-                };
-
-                SetStatus(attempt == 0 ? RelayStatus.Connecting : RelayStatus.Reconnecting);
-                var disconnected = NewSignal();
-                Volatile.Write(ref _disconnected, disconnected);
-
                 try
                 {
-                    LogConnecting(_logger, options.ToString());
-                    await _transport.ConnectAsync(options, stopping).ConfigureAwait(false);
+                    var snapshot = _settings.Current;
+                    Volatile.Write(ref _activeFingerprint, Fingerprint(snapshot));
+
+                    var settingsStatus = RelayStatusDescriber.FromSettings(snapshot);
+                    if (settingsStatus != RelayStatus.Disconnected)
+                    {
+                        SetStatus(settingsStatus);
+                        await WaitForWakeAsync(delay: null, stopping).ConfigureAwait(false);
+                        attempt = 0;
+                        continue;
+                    }
+
+                    var settings = snapshot.Settings;
+                    if (!TryGetPassword(settings.Mqtt, out var password))
+                    {
+                        SetStatus(RelayStatus.Error);
+                        await WaitForWakeAsync(delay: null, stopping).ConfigureAwait(false);
+                        attempt = 0;
+                        continue;
+                    }
+
+                    var topics = new MqttTopics(settings.Mqtt, settings.Device);
+                    var options = new MqttConnectionOptions
+                    {
+                        Host = settings.Mqtt.Host,
+                        Port = settings.Mqtt.Port,
+                        ClientId = $"shr-{settings.Device.Id}",
+                        Username = string.IsNullOrEmpty(settings.Mqtt.Username) ? null : settings.Mqtt.Username,
+                        Password = password,
+                        WillTopic = topics.Availability,
+                    };
+
+                    SetStatus(attempt == 0 ? RelayStatus.Connecting : RelayStatus.Reconnecting);
+                    var disconnected = NewSignal();
+                    Volatile.Write(ref _disconnected, disconnected);
+
+                    try
+                    {
+                        LogConnecting(_logger, options.ToString());
+                        await _transport.ConnectAsync(options, stopping).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (!stopping.IsCancellationRequested)
+                    {
+                        var delay = _backoff.GetDelay(attempt++);
+                        if (ex is MqttConnectionRefusedException { IsAuthenticationFailure: true })
+                        {
+                            // Still retried (the broker's accounts may change), but the user must act: show an error.
+                            LogCredentialsRejected(_logger, options.ToString(), delay.TotalSeconds);
+                            SetStatus(RelayStatus.Error);
+                        }
+                        else
+                        {
+                            LogConnectFailed(_logger, ex, options.ToString(), delay.TotalSeconds);
+                            SetStatus(RelayStatus.Reconnecting);
+                        }
+
+                        if (await WaitForWakeAsync(delay, stopping).ConfigureAwait(false))
+                        {
+                            attempt = 0;
+                        }
+
+                        continue;
+                    }
+
+                    attempt = 0;
+                    Volatile.Write(ref _connectedTopics, topics);
+                    await OnConnectedAsync(topics, settings, stopping).ConfigureAwait(false);
+
+                    var dropped = await WaitForDisconnectOrWakeAsync(disconnected.Task, stopping).ConfigureAwait(false);
+                    if (dropped)
+                    {
+                        var delay = _backoff.GetDelay(0);
+                        attempt = 1;
+                        LogConnectionLost(_logger, delay.TotalSeconds);
+                        SetStatus(RelayStatus.Reconnecting);
+                        await WaitForWakeAsync(delay, stopping).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    // Woken by a settings change or a reconnect request: leave cleanly, then loop.
+                    await GoOfflineAsync(topics).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (!stopping.IsCancellationRequested)
                 {
+                    // A bug or an unexpected library error must not end the loop: the app would
+                    // never reconnect again. Log it and retry with backoff.
                     var delay = _backoff.GetDelay(attempt++);
-                    LogConnectFailed(_logger, ex, options.ToString(), delay.TotalSeconds);
-                    SetStatus(RelayStatus.Reconnecting);
-                    if (await WaitForWakeAsync(delay, stopping).ConfigureAwait(false))
-                    {
-                        attempt = 0;
-                    }
-
-                    continue;
-                }
-
-                attempt = 0;
-                await OnConnectedAsync(topics, settings, stopping).ConfigureAwait(false);
-
-                var dropped = await WaitForDisconnectOrWakeAsync(disconnected.Task, stopping).ConfigureAwait(false);
-                if (dropped)
-                {
-                    var delay = _backoff.GetDelay(0);
-                    attempt = 1;
-                    LogConnectionLost(_logger, delay.TotalSeconds);
+                    LogLoopFailed(_logger, ex, delay.TotalSeconds);
                     SetStatus(RelayStatus.Reconnecting);
                     await WaitForWakeAsync(delay, stopping).ConfigureAwait(false);
-                    continue;
                 }
-
-                // Woken by a settings change or a reconnect request: leave cleanly, then loop.
-                await GoOfflineAsync(topics).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        catch (Exception) when (stopping.IsCancellationRequested)
         {
+            // Stopping. MQTTnet reports a cancelled operation as MqttCommunicationTimedOutException, not
+            // OperationCanceledException, so any exception here is expected.
         }
         finally
         {
-            if (_transport.IsConnected)
+            if (_transport.IsConnected && Volatile.Read(ref _connectedTopics) is { } connectedTopics)
             {
-                var settings = _settings.Current.Settings;
-                await GoOfflineAsync(new MqttTopics(settings.Mqtt, settings.Device)).ConfigureAwait(false);
+                // The topics of the live connection, not of the latest settings, which may have changed.
+                await GoOfflineAsync(connectedTopics).ConfigureAwait(false);
             }
 
             SetStatus(RelayStatus.Disconnected);
@@ -212,10 +238,14 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
             LogConnected(_logger, topics.Availability);
             await _handler.OnConnectedAsync(topics, settings, stopping).ConfigureAwait(false);
         }
-        catch (Exception ex) when (!stopping.IsCancellationRequested)
+        catch (Exception ex)
         {
-            // If the connection itself died, the Disconnected signal drives the reconnect.
-            LogSessionSetupFailed(_logger, ex);
+            // While stopping this is expected and ignored. Otherwise, if the connection itself died, the
+            // Disconnected signal drives the reconnect.
+            if (!stopping.IsCancellationRequested)
+            {
+                LogSessionSetupFailed(_logger, ex);
+            }
         }
     }
 
@@ -346,11 +376,17 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not connect to {Endpoint}; retrying in {DelaySeconds:0.0}s")]
     private static partial void LogConnectFailed(ILogger logger, Exception exception, string endpoint, double delaySeconds);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "The broker {Endpoint} rejected the user name or password. Check mqtt.username and mqtt.password in settings.json. Retrying in {DelaySeconds:0.0}s")]
+    private static partial void LogCredentialsRejected(ILogger logger, string endpoint, double delaySeconds);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Connection to the broker was lost; reconnecting in {DelaySeconds:0.0}s")]
     private static partial void LogConnectionLost(ILogger logger, double delaySeconds);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Connected, but setting up the session failed")]
     private static partial void LogSessionSetupFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unexpected error in the connection loop; retrying in {DelaySeconds:0.0}s")]
+    private static partial void LogLoopFailed(ILogger logger, Exception exception, double delaySeconds);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Published offline and disconnected")]
     private static partial void LogDisconnected(ILogger logger);
@@ -358,7 +394,7 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not publish offline before disconnecting; the broker's last will covers it")]
     private static partial void LogGoOfflineFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "The saved MQTT password cannot be decrypted (settings.json may come from another user or PC). Enter the password again")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "mqtt.passwordProtected in settings.json is not a password encrypted by this app for this Windows user. Type the password into mqtt.password instead (it is encrypted automatically) and clear passwordProtected")]
     private static partial void LogPasswordDecryptFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Connection settings changed; reconnecting")]

@@ -96,6 +96,27 @@ public sealed class MqttConnectionSupervisorTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task ConnectRefused_BadCredentials_ReportsErrorAndKeepsRetrying()
+    {
+        _transport.FailNextConnects(1, new MqttConnectionRefusedException("NotAuthorized", isAuthenticationFailure: true));
+
+        await StartAndWaitForStatusAsync(RelayStatus.Error);
+
+        await Eventually.TrueAsync(
+            () => _supervisor.Status == RelayStatus.Connected,
+            "the retry succeeds once the broker accepts",
+            betweenChecks: () => _time.Advance(TimeSpan.FromMilliseconds(500)));
+    }
+
+    [Fact]
+    public async Task ConnectRefused_OtherReason_ReportsReconnecting()
+    {
+        _transport.FailNextConnects(1, new MqttConnectionRefusedException("ServerUnavailable", isAuthenticationFailure: false));
+
+        await StartAndWaitForStatusAsync(RelayStatus.Reconnecting);
+    }
+
+    [Fact]
     public async Task ConnectionDropped_ReconnectsAndRepublishesOnline()
     {
         await StartAndWaitForStatusAsync(RelayStatus.Connected);
@@ -233,6 +254,43 @@ public sealed class MqttConnectionSupervisorTests : IAsyncDisposable
         _transport.IsConnected.ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task Stop_DuringSessionSetup_DoesNotThrowAndStillPublishesOffline()
+    {
+        // Regression: MQTTnet reports a cancelled publish/subscribe as a timeout exception, which escaped
+        // from StopAsync when the app was stopped right after connecting.
+        _handler.HangUntilCancelled = true;
+        await StartAndWaitForStatusAsync(RelayStatus.Connected);
+        await Eventually.TrueAsync(() => _handler.Sessions.Count == 1, "session setup is in progress");
+
+        await Should.NotThrowAsync(() => _supervisor.StopAsync(TestContext.Current.CancellationToken));
+
+        _transport.Calls.Last().ShouldBe("disconnect");
+        _transport.PublishedTo(Availability).Last().Payload.ShouldBe("offline");
+    }
+
+    [Fact]
+    public async Task UnexpectedErrorInLoop_IsRetriedInsteadOfEndingTheLoop()
+    {
+        // Regression: any exception other than a cancellation used to end the loop, so the app would
+        // never reconnect again.
+        var protector = new ThrowOnceProtector();
+        var settings = FakeSettingsState.Configured();
+        settings.Mqtt.PasswordProtected = new FakeSecretProtector().Protect("secret");
+        _settings.Set(settings);
+        await using var supervisor = new MqttConnectionSupervisor(
+            _transport, _handler, _settings, protector, new ReconnectBackoff(new NoJitterRandom()), _time, NullLogger<MqttConnectionSupervisor>.Instance);
+
+        await supervisor.StartAsync(TestContext.Current.CancellationToken);
+
+        await Eventually.TrueAsync(
+            () => supervisor.Status == RelayStatus.Connected,
+            "it recovers after the backoff delay",
+            betweenChecks: () => _time.Advance(TimeSpan.FromMilliseconds(500)));
+        protector.Calls.ShouldBe(2);
+        await supervisor.StopAsync(TestContext.Current.CancellationToken);
+    }
+
     private async Task StartAndWaitForStatusAsync(RelayStatus status)
     {
         await _supervisor.StartAsync(TestContext.Current.CancellationToken);
@@ -245,11 +303,41 @@ public sealed class MqttConnectionSupervisorTests : IAsyncDisposable
 
         public bool ThrowOnConnect { get; set; }
 
-        public Task OnConnectedAsync(MqttTopics topics, AppSettings settings, CancellationToken cancellationToken)
+        /// <summary>Waits until cancelled, then throws a non-cancellation exception, as MQTTnet does.</summary>
+        public bool HangUntilCancelled { get; set; }
+
+        public async Task OnConnectedAsync(MqttTopics topics, AppSettings settings, CancellationToken cancellationToken)
         {
             Sessions.Enqueue((topics, settings));
-            return ThrowOnConnect ? throw new InvalidOperationException("Session setup failed.") : Task.CompletedTask;
+            if (ThrowOnConnect)
+            {
+                throw new InvalidOperationException("Session setup failed.");
+            }
+
+            if (HangUntilCancelled)
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw new TimeoutException("The operation has timed out.");
+                }
+            }
         }
+    }
+
+    private sealed class ThrowOnceProtector : SmartHomeRelay.Core.Abstractions.ISecretProtector
+    {
+        private readonly FakeSecretProtector _inner = new();
+
+        public int Calls { get; private set; }
+
+        public string Protect(string plainText) => _inner.Protect(plainText);
+
+        public string Unprotect(string protectedValue) =>
+            ++Calls == 1 ? throw new InvalidOperationException("Unexpected failure.") : _inner.Unprotect(protectedValue);
     }
 
     private sealed class NoJitterRandom : Random

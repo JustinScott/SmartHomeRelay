@@ -16,20 +16,35 @@ internal static class MqttBrokerFixture
 
     public static int Port { get; } = int.TryParse(Environment.GetEnvironmentVariable("SHR_TEST_MQTT_PORT"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var port) ? port : 1883;
 
+    /// <summary>
+    /// A second listener that requires a user name and password, like the HA Mosquitto add-on:
+    /// <c>SHR_TEST_MQTT_AUTH_PORT</c> (default 1884), user <c>SHR_TEST_MQTT_USER</c>/<c>SHR_TEST_MQTT_PASSWORD</c>
+    /// (default relay / correct-horse).
+    /// </summary>
+    public static int AuthPort { get; } = int.TryParse(Environment.GetEnvironmentVariable("SHR_TEST_MQTT_AUTH_PORT"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var authPort) ? authPort : 1884;
+
+    public static string AuthUser { get; } = Environment.GetEnvironmentVariable("SHR_TEST_MQTT_USER") is { Length: > 0 } user ? user : "relay";
+
+    public static string AuthPassword { get; } = Environment.GetEnvironmentVariable("SHR_TEST_MQTT_PASSWORD") is { Length: > 0 } password ? password : "correct-horse";
+
     private static bool Required => Environment.GetEnvironmentVariable("SHR_REQUIRE_MQTT_BROKER") == "1";
 
-    public static async Task EnsureAvailableAsync()
+    public static Task EnsureAvailableAsync() => EnsureAvailableAsync(Port);
+
+    public static Task EnsureAuthBrokerAvailableAsync() => EnsureAvailableAsync(AuthPort);
+
+    private static async Task EnsureAvailableAsync(int port)
     {
         try
         {
             using var tcp = new TcpClient();
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            await tcp.ConnectAsync(Host, Port, timeout.Token);
+            await tcp.ConnectAsync(Host, port, timeout.Token);
             return;
         }
         catch (Exception ex) when (ex is SocketException or OperationCanceledException)
         {
-            var message = $"No MQTT broker at {Host}:{Port}. Start Mosquitto or set SHR_TEST_MQTT_HOST.";
+            var message = $"No MQTT broker at {Host}:{port}. Start Mosquitto or set SHR_TEST_MQTT_HOST.";
             if (Required)
             {
                 Assert.Fail(message);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SmartHomeRelay.Core.Abstractions;
 
 namespace SmartHomeRelay.Core.Configuration;
@@ -21,16 +22,45 @@ public sealed class JsonSettingsStore(IAppPaths paths) : ISettingsStore
             Directory.CreateDirectory(directory);
         }
 
+        var document = WithPasswordPlaceholder(JsonSerializer.SerializeToNode(settings, SettingsJson.Options)!.AsObject());
+
         // Write to a temp file and swap it in, so a crash mid-write never leaves a truncated settings file.
         var tempPath = path + ".tmp";
         var stream = File.Create(tempPath);
         await using (stream.ConfigureAwait(false))
         {
-            await JsonSerializer.SerializeAsync(stream, settings, SettingsJson.Options, cancellationToken)
+            await JsonSerializer.SerializeAsync(stream, document, SettingsJson.Options, cancellationToken)
                 .ConfigureAwait(false);
         }
 
         File.Move(tempPath, path, overwrite: true);
+    }
+
+    /// <summary>
+    /// Adds an always-empty <c>"password": ""</c> right after <c>username</c>. Without it, users editing the
+    /// file by hand typed their password into <c>passwordProtected</c>, which only holds encrypted values.
+    /// The plain password itself is never serialized.
+    /// </summary>
+    private static JsonObject WithPasswordPlaceholder(JsonObject root)
+    {
+        if (root["mqtt"] is not JsonObject mqtt)
+        {
+            return root;
+        }
+
+        var ordered = new JsonObject();
+        foreach (var (key, value) in mqtt.ToList())
+        {
+            mqtt.Remove(key);
+            ordered[key] = value;
+            if (key == "username")
+            {
+                ordered["password"] = string.Empty;
+            }
+        }
+
+        root["mqtt"] = ordered;
+        return root;
     }
 
     /// <inheritdoc />

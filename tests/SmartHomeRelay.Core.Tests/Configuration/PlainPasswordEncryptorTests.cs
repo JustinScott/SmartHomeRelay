@@ -27,11 +27,11 @@ public sealed class PlainPasswordEncryptorTests : IDisposable
 
         var text = await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken);
         text.ShouldNotContain("hunter2");
-        text.ShouldNotContain("\"password\"");
 
         using var document = JsonDocument.Parse(text);
         var mqtt = document.RootElement.GetProperty("mqtt");
         new FakeSecretProtector().Unprotect(mqtt.GetProperty("passwordProtected").GetString()!).ShouldBe("hunter2");
+        mqtt.GetProperty("password").GetString().ShouldBe(string.Empty);
         mqtt.GetProperty("host").GetString().ShouldBe("broker.local");
         mqtt.GetProperty("username").GetString().ShouldBe("relay");
         document.RootElement.GetProperty("device").GetProperty("id").GetString().ShouldBe("DESKTOP-ABC123");

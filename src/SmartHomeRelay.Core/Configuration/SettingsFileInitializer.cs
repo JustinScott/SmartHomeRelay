@@ -20,7 +20,7 @@ public sealed partial class SettingsFileInitializer(
     internal const string WelcomeTitle = "Welcome to Smart Home Relay";
 
     internal const string WelcomeMessage =
-        "Enter your MQTT broker host, user name, and password in settings.json, then save. " +
+        "Fill in host, username, and password under \"mqtt\" in settings.json, then save. " +
         "The password is encrypted automatically and the app connects on its own.";
 
     /// <inheritdoc />

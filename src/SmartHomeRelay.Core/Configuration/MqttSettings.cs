@@ -24,9 +24,10 @@ public sealed class MqttSettings
     public string PasswordProtected { get; set; } = string.Empty;
 
     /// <summary>
-    /// A password the user typed into settings.json by hand (spec 7). Read only: it is never written back
-    /// (<see cref="JsonIgnoreAttribute"/>), and <see cref="PlainPasswordEncryptor"/> moves it into
-    /// <see cref="PasswordProtected"/> as soon as it is seen. Never log this.
+    /// A password the user typed into settings.json by hand (spec 7). Never serialized
+    /// (<see cref="JsonIgnoreAttribute"/>): <see cref="JsonSettingsStore"/> always writes it as an empty
+    /// <c>"password": ""</c> placeholder so users can see where to type, and <see cref="PlainPasswordEncryptor"/>
+    /// moves a typed value into <see cref="PasswordProtected"/> as soon as it is seen. Never log this.
     /// </summary>
     [JsonIgnore]
     public string Password { get; set; } = string.Empty;

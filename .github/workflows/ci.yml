@@ -60,11 +60,11 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Install and start Mosquitto
+      - name: Install Mosquitto and start the test brokers
         run: |
           sudo apt-get update
           sudo apt-get install -y mosquitto
-          sudo systemctl start mosquitto
+          bash tests/brokers/start-test-brokers.sh
 
       - name: Test against a real broker
         env:

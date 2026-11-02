@@ -155,10 +155,19 @@ public sealed class MqttBrokerTests : IAsyncLifetime
 
         // A second client with the same client ID makes the broker drop ours: a real connection loss.
         using var intruder = new MqttClientFactory().CreateMqttClient();
-        await intruder.ConnectAsync(new MqttClientOptionsBuilder().WithTcpServer(MqttBrokerFixture.Host, MqttBrokerFixture.Port).WithClientId("shr-" + _deviceId).Build(), TestContext.Current.CancellationToken);
+        try
+        {
+            await intruder.ConnectAsync(new MqttClientOptionsBuilder().WithTcpServer(MqttBrokerFixture.Host, MqttBrokerFixture.Port).WithClientId("shr-" + _deviceId).Build(), TestContext.Current.CancellationToken);
+        }
+        catch (MQTTnet.Exceptions.MqttCommunicationException)
+        {
+            // Our app may reconnect and take the client ID back before the intruder's handshake finishes.
+            // The intruder only exists to force the disconnect, so its own result doesn't matter.
+        }
 
         await Eventually.TrueAsync(() => observer.Saw(_topics.Availability, "online"), "it reconnects (after ~1s backoff) and republishes online");
-        supervisor.Status.ShouldBe(RelayStatus.Connected);
+        // The observer can see "online" just before our publish call returns and the status flips.
+        await Eventually.TrueAsync(() => supervisor.Status == RelayStatus.Connected, "status returns to Connected");
     }
 
     private AppSettings Settings()
