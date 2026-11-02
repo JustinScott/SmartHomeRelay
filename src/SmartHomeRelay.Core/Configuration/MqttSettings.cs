@@ -23,6 +23,14 @@ public sealed class MqttSettings
     /// <summary>The password encrypted with DPAPI (CurrentUser scope), base64 encoded. Never the plain text.</summary>
     public string PasswordProtected { get; set; } = string.Empty;
 
+    /// <summary>
+    /// A password the user typed into settings.json by hand (spec 7). Read only: it is never written back
+    /// (<see cref="JsonIgnoreAttribute"/>), and <see cref="PlainPasswordEncryptor"/> moves it into
+    /// <see cref="PasswordProtected"/> as soon as it is seen. Never log this.
+    /// </summary>
+    [JsonIgnore]
+    public string Password { get; set; } = string.Empty;
+
     /// <summary>Home Assistant MQTT discovery prefix.</summary>
     public string DiscoveryPrefix { get; set; } = "homeassistant";
 

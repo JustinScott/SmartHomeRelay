@@ -108,6 +108,8 @@ public sealed class SettingsValidatorTests
     [InlineData("pc/1")]
     [InlineData("pc+")]
     [InlineData("pc#")]
+    [InlineData("pc.local")]
+    [InlineData("pcé")]
     public void Validate_InvalidDeviceId_ReturnsDeviceIdError(string id)
     {
         var settings = TestSettings.Valid();

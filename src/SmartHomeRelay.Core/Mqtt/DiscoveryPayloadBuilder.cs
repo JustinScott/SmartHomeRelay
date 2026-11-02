@@ -1,0 +1,139 @@
+using System.Text;
+using System.Text.Json;
+using SmartHomeRelay.Core.Configuration;
+using SmartHomeRelay.Core.Entities;
+
+namespace SmartHomeRelay.Core.Mqtt;
+
+/// <summary>
+/// Builds HA MQTT discovery configs (spec 4.1, 4.3). Fixes the prototype's defects: every config has a
+/// valid <c>device</c> block, and availability payloads match what is published to the status topic.
+/// Output is deterministic so it can be snapshot-tested.
+/// </summary>
+public static class DiscoveryPayloadBuilder
+{
+    /// <summary>The HA device manufacturer.</summary>
+    public const string Manufacturer = "Smart Home Relay";
+
+    /// <summary>The HA device model.</summary>
+    public const string Model = "Windows PC";
+
+    /// <summary>Command payload HA sends when a button is pressed.</summary>
+    public const string ButtonPressPayload = "PRESS";
+
+    /// <summary>ON payload for switches and binary sensors.</summary>
+    public const string On = "ON";
+
+    /// <summary>OFF payload for switches and binary sensors.</summary>
+    public const string Off = "OFF";
+
+    private static readonly JsonWriterOptions s_writerOptions = new() { Indented = false };
+
+    /// <summary>Builds the retained config payload for <paramref name="entity"/>.</summary>
+    public static string Build(EntityDescriptor entity, MqttTopics topics, DeviceSettings device, string swVersion)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(topics);
+        ArgumentNullException.ThrowIfNull(device);
+
+        using var stream = new MemoryStream();
+        using (var json = new Utf8JsonWriter(stream, s_writerOptions))
+        {
+            json.WriteStartObject();
+            json.WriteString("name", entity.Name);
+            json.WriteString("unique_id", UniqueIds.For(device.Id, entity.Key));
+            json.WriteBoolean("has_entity_name", true);
+
+            json.WriteString("availability_topic", topics.Availability);
+            json.WriteString("payload_available", MqttTopics.Online);
+            json.WriteString("payload_not_available", MqttTopics.Offline);
+
+            if (entity.HasState)
+            {
+                json.WriteString("state_topic", topics.State(entity.Key));
+            }
+
+            if (entity.AcceptsCommands)
+            {
+                json.WriteString("command_topic", topics.Command(entity.Key));
+                json.WriteNumber("qos", 1);
+            }
+
+            WriteComponentFields(json, entity);
+            WriteOptional(json, "device_class", entity.DeviceClass);
+            WriteOptional(json, "unit_of_measurement", entity.UnitOfMeasurement);
+            WriteOptional(json, "state_class", entity.StateClass);
+            WriteOptional(json, "icon", entity.Icon);
+
+            if (entity.Category is { } category)
+            {
+                json.WriteString("entity_category", category == EntityCategory.Config ? "config" : "diagnostic");
+            }
+
+            if (entity.Options is { Count: > 0 } options)
+            {
+                json.WriteStartArray("options");
+                foreach (var option in options)
+                {
+                    json.WriteStringValue(option);
+                }
+
+                json.WriteEndArray();
+            }
+
+            json.WriteStartObject("device");
+            json.WriteStartArray("identifiers");
+            json.WriteStringValue(device.Id);
+            json.WriteEndArray();
+            json.WriteString("name", device.Name);
+            json.WriteString("manufacturer", Manufacturer);
+            json.WriteString("model", Model);
+            json.WriteString("sw_version", swVersion);
+            json.WriteEndObject();
+
+            json.WriteStartObject("origin");
+            json.WriteString("name", Manufacturer);
+            json.WriteString("sw_version", swVersion);
+            json.WriteEndObject();
+
+            json.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static void WriteComponentFields(Utf8JsonWriter json, EntityDescriptor entity)
+    {
+        switch (entity.Component)
+        {
+            case EntityComponent.Button:
+                json.WriteString("payload_press", ButtonPressPayload);
+                break;
+            case EntityComponent.Switch:
+                json.WriteString("payload_on", On);
+                json.WriteString("payload_off", Off);
+                json.WriteString("state_on", On);
+                json.WriteString("state_off", Off);
+                break;
+            case EntityComponent.BinarySensor:
+                json.WriteString("payload_on", On);
+                json.WriteString("payload_off", Off);
+                break;
+            case EntityComponent.Number when entity.Range is { } range:
+                json.WriteNumber("min", range.Min);
+                json.WriteNumber("max", range.Max);
+                json.WriteNumber("step", range.Step);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private static void WriteOptional(Utf8JsonWriter json, string name, string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            json.WriteString(name, value);
+        }
+    }
+}

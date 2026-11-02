@@ -24,7 +24,7 @@ public static class WindowsPlatformServiceCollectionExtensions
         services.AddSingleton(singleInstanceGuard);
         services.AddSingleton<IHostNameProvider, DnsHostNameProvider>();
         services.AddSingleton<ISecretProtector, DpapiSecretProtector>();
-        services.AddSingleton<IFolderOpener, ShellFolderOpener>();
+        services.AddSingleton<IShellLauncher, ShellLauncher>();
         return services;
     }
 }

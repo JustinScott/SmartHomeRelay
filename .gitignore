@@ -20,3 +20,6 @@ installer/Output/
 # Never commit local settings or secrets (settings.json normally lives in %APPDATA%)
 settings.json
 *.pfx
+
+# Snapshot test output awaiting review
+*.received.json

@@ -46,6 +46,19 @@ public sealed class RelayStatusDescriberTests
         }
     }
 
+    [Theory]
+    [InlineData(RelayStatus.Connected, StatusSeverity.Ok)]
+    [InlineData(RelayStatus.Connecting, StatusSeverity.Warning)]
+    [InlineData(RelayStatus.Reconnecting, StatusSeverity.Warning)]
+    [InlineData(RelayStatus.NotConfigured, StatusSeverity.Warning)]
+    [InlineData(RelayStatus.Disconnected, StatusSeverity.Warning)]
+    [InlineData(RelayStatus.SettingsInvalid, StatusSeverity.Error)]
+    [InlineData(RelayStatus.Error, StatusSeverity.Error)]
+    public void Severity_MapsEveryStatus(RelayStatus status, StatusSeverity expected)
+    {
+        RelayStatusDescriber.Severity(status).ShouldBe(expected);
+    }
+
     [Fact]
     public void Describe_UnknownStatus_Throws()
     {

@@ -51,15 +51,40 @@ public sealed class SettingsFileInitializerTests : IDisposable
     }
 
     [Fact]
-    public void AddRelaySettings_RegistersStateBeforeInitializer()
+    public async Task StartHostedServices_NoFile_OpensFileAndShowsWelcome()
+    {
+        using var context = new SettingsTestContext(_paths);
+
+        await StartAllAsync(context);
+
+        context.Shell.OpenedFiles.ShouldBe([_paths.SettingsFilePath]);
+        context.Notifier.Notifications.Count.ShouldBe(1);
+        context.Notifier.Notifications[0].Title.ShouldBe(SettingsFileInitializer.WelcomeTitle);
+    }
+
+    [Fact]
+    public async Task StartHostedServices_ExistingFile_DoesNotOpenItOrNotify()
+    {
+        _paths.WriteSettingsFile("""{ "mqtt": { "host": "broker.local" } }""");
+        using var context = new SettingsTestContext(_paths);
+
+        await StartAllAsync(context);
+
+        context.Shell.OpenedFiles.ShouldBeEmpty();
+        context.Notifier.Notifications.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AddRelaySettings_RegistersStateBeforeInitializerAndEncryptor()
     {
         using var context = new SettingsTestContext(_paths);
 
         var hosted = context.Services.GetServices<IHostedService>().ToList();
 
-        hosted.Count.ShouldBe(2);
+        hosted.Count.ShouldBe(3);
         hosted[0].ShouldBeOfType<SettingsState>();
         hosted[1].ShouldBeOfType<SettingsFileInitializer>();
+        hosted[2].ShouldBeOfType<PlainPasswordEncryptor>();
     }
 
     private static async Task StartAllAsync(SettingsTestContext context)

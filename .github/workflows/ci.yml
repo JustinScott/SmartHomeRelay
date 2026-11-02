@@ -48,3 +48,26 @@ jobs:
         with:
           name: SmartHomeRelay-win-x64
           path: publish
+
+  # Windows runners cannot run Linux containers, so the real-broker tests run here (spec 9).
+  # Core is cross-platform, so its tests run unchanged on Linux.
+  mqtt-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Install and start Mosquitto
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mosquitto
+          sudo systemctl start mosquitto
+
+      - name: Test against a real broker
+        env:
+          # A missing broker fails the job instead of silently skipping the tests.
+          SHR_REQUIRE_MQTT_BROKER: "1"
+        run: dotnet test tests/SmartHomeRelay.Core.Tests/SmartHomeRelay.Core.Tests.csproj --configuration Release --filter "Category=MqttBroker"

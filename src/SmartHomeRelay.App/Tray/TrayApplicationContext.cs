@@ -1,43 +1,49 @@
 using Microsoft.Extensions.Hosting;
 using SmartHomeRelay.Core.Abstractions;
-using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Hosting;
+using SmartHomeRelay.Core.Mqtt;
 
 namespace SmartHomeRelay.App.Tray;
 
 /// <summary>
-/// The tray icon and its menu (spec 7.1). A thin view: status comes from <see cref="RelayStatusDescriber"/>.
-/// Menu items are added in the milestones that implement them.
+/// The tray icon and its menu (spec 7.1). A thin view: status text and severity come from
+/// <see cref="RelayStatusDescriber"/>. Menu items are added in the milestones that implement them.
 /// </summary>
 internal sealed class TrayApplicationContext : ApplicationContext
 {
     private const string AppName = "Smart Home Relay";
-    private const int BalloonTimeoutMs = 3000;
+    private const int BalloonTimeoutMs = 5000;
 
-    private readonly ISettingsState _settings;
+    private readonly IRelayStatusSource _status;
+    private readonly IReconnectRequester _reconnect;
     private readonly ISingleInstanceGuard _singleInstance;
-    private readonly IFolderOpener _folderOpener;
+    private readonly IShellLauncher _shell;
     private readonly IAppPaths _paths;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly TrayNotifier _notifier;
     private readonly SynchronizationContext _uiContext;
     private readonly CancellationTokenRegistration _stoppingRegistration;
-    private readonly Icon _icon;
+    private readonly Dictionary<StatusSeverity, Icon> _icons;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
     private readonly NotifyIcon _notifyIcon;
 
     public TrayApplicationContext(
-        ISettingsState settings,
+        IRelayStatusSource status,
+        IReconnectRequester reconnect,
         ISingleInstanceGuard singleInstance,
-        IFolderOpener folderOpener,
+        IShellLauncher shell,
         IAppPaths paths,
-        IHostApplicationLifetime lifetime)
+        IHostApplicationLifetime lifetime,
+        TrayNotifier notifier)
     {
-        _settings = settings;
+        _status = status;
+        _reconnect = reconnect;
         _singleInstance = singleInstance;
-        _folderOpener = folderOpener;
+        _shell = shell;
         _paths = paths;
         _lifetime = lifetime;
+        _notifier = notifier;
 
         // Creating the first control installs the WinForms synchronization context on this (UI) thread.
         _menu = new ContextMenuStrip();
@@ -47,21 +53,25 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _statusItem = new ToolStripMenuItem { Enabled = false };
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add("Open logs folder", null, (_, _) => _folderOpener.Open(_paths.LogsDirectory));
+
+        // Until the settings window exists (milestone 9), Settings opens settings.json (spec 7).
+        _menu.Items.Add("Settings", null, (_, _) => _shell.OpenFile(_paths.SettingsFilePath));
+        _menu.Items.Add("Reconnect", null, (_, _) => _reconnect.RequestReconnect());
+        _menu.Items.Add("Open logs folder", null, (_, _) => _shell.OpenFolder(_paths.LogsDirectory));
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add("Exit", null, (_, _) => _lifetime.StopApplication());
 
-        _icon = TrayIcons.LoadAppIcon();
+        _icons = Enum.GetValues<StatusSeverity>().ToDictionary(s => s, TrayIcons.Load);
         _notifyIcon = new NotifyIcon
         {
-            Icon = _icon,
             ContextMenuStrip = _menu,
             Visible = true,
         };
 
         UpdateStatus();
-        _settings.Changed += OnSettingsChanged;
+        _status.StatusChanged += OnStatusChanged;
         _singleInstance.SecondInstanceStarted += OnSecondInstanceStarted;
+        _notifier.Attach((title, message) => _uiContext.Post(_ => ShowBalloon(title, message), null));
         _stoppingRegistration = _lifetime.ApplicationStopping.Register(() => _uiContext.Post(_ => ExitThread(), null));
     }
 
@@ -76,29 +86,36 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (disposing)
         {
-            _settings.Changed -= OnSettingsChanged;
+            _notifier.Detach();
+            _status.StatusChanged -= OnStatusChanged;
             _singleInstance.SecondInstanceStarted -= OnSecondInstanceStarted;
             _stoppingRegistration.Dispose();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _menu.Dispose();
-            _icon.Dispose();
+            foreach (var icon in _icons.Values)
+            {
+                icon.Dispose();
+            }
         }
 
         base.Dispose(disposing);
     }
 
-    private void OnSettingsChanged(object? sender, EventArgs e) => _uiContext.Post(_ => UpdateStatus(), null);
+    private void OnStatusChanged(object? sender, EventArgs e) => _uiContext.Post(_ => UpdateStatus(), null);
 
     private void OnSecondInstanceStarted(object? sender, EventArgs e) =>
-        _uiContext.Post(
-            _ => _notifyIcon.ShowBalloonTip(BalloonTimeoutMs, AppName, $"{AppName} is already running.", ToolTipIcon.Info),
-            null);
+        _uiContext.Post(_ => ShowBalloon(AppName, $"{AppName} is already running."), null);
+
+    private void ShowBalloon(string title, string message) =>
+        _notifyIcon.ShowBalloonTip(BalloonTimeoutMs, title, message, ToolTipIcon.Info);
 
     private void UpdateStatus()
     {
-        var text = RelayStatusDescriber.Describe(RelayStatusDescriber.FromSettings(_settings.Current));
+        var status = _status.Status;
+        var text = RelayStatusDescriber.Describe(status);
         _statusItem.Text = $"Status: {text}";
         _notifyIcon.Text = $"{AppName}: {text}";
+        _notifyIcon.Icon = _icons[RelayStatusDescriber.Severity(status)];
     }
 }

@@ -151,6 +151,13 @@ public interface IModuleContext
 }
 ```
 
+Behavior of the host (`Core/Hosting/ModuleHost`), implemented in milestone 2:
+
+- `StartAsync` is called once when a module becomes enabled (at startup or after a settings change), not on every reconnect. `StopAsync` is called when it is disabled or the app exits.
+- `PublishStateAsync` can be called at any time, including while disconnected. The host keeps the latest value per entity and publishes all of them after every (re)connect and when HA restarts, so modules never track the connection.
+- Commands run on background tasks, never inside the MQTT receive callback, so a slow handler never delays other commands. Commands for a disabled module's entities are ignored.
+- A module whose entities break the rules (invalid or duplicate key, command entity without a handler, number without a range) is rejected as a whole and logged; the others run normally.
+
 Rules for modules:
 
 - One public type per file. Typical module = `XxxModule.cs` + small collaborators (`XxxStateReader.cs`, `XxxCommandHandler.cs`).
@@ -208,7 +215,7 @@ Package versions are pinned centrally in `Directory.Packages.props`.
 
 ### 4.1 Identity
 
-- `deviceId`: the machine's host name by default (same as the prototype's `Dns.GetHostName()`, so existing topics keep working), configurable. Immutable once entities exist in HA (changing it creates new entities). A sanitized form is used inside `unique_id` values.
+- `deviceId`: the machine's host name by default (same as the prototype's `Dns.GetHostName()`, so existing topics keep working), configurable. Only letters, digits, `-`, and `_` are allowed, because it is also the `node_id` in HA discovery topics (Windows host names already fit). Immutable once entities exist in HA (changing it creates new entities). A sanitized form is used inside `unique_id` values.
 - Entity `unique_id`: `{sanitizedDeviceId}_{entityKey}`, where `sanitizedDeviceId` is the device ID lowercased with every character other than `a-z`, `0-9`, and `_` replaced by `_` (host `DESKTOP-ABC123` gives `desktop_abc123_cpu_usage`). Topics use the device ID exactly as configured. **This rule is permanent**: changing it orphans every HA entity.
 - All entities are grouped under one HA **device** (manufacturer `Smart Home Relay`, model `Windows PC`, `sw_version` from assembly version, `identifiers: [deviceId]`).
 - MQTT client ID: `shr-{deviceId}`.
@@ -233,6 +240,8 @@ Defaults: `discoveryPrefix = homeassistant`, `baseTopic = shr`.
 - **Full state publish** after every (re)connect and every resume.
 - **QoS 1** for commands and availability; state is retained where it makes sense (sensors yes, buttons no).
 - **Reconnect:** automatic with exponential backoff (1s → 60s cap) and jitter. Never crash on broker unavailability. Log and keep retrying.
+- **Protocol:** MQTT 3.1.1, for compatibility with any broker. 3.1.1 has no disconnect reasons, so the last will is only sent when the socket drops uncleanly; every clean disconnect therefore publishes `offline` first.
+- **Reconnect on settings change:** only when a connection-related setting changes (host, port, credentials, topics, device ID or name). Toggling a feature republishes discovery without reconnecting.
 - **Payload conventions:** plain strings for simple values (`ON`/`OFF`, numbers); JSON only where structured data is needed (notifications).
 
 ---
@@ -428,7 +437,7 @@ Notes:
 
 - Tabs or sections: **Connection** (host, port, username, password, **Test connection** button), **Device** (name, ID), **Features** (toggles and per-feature options), **General** (start with Windows, log level).
 - The form is a thin view. A `SettingsPresenter` (in `App/Settings/`, depending only on abstractions) holds validation and save logic and is unit-testable.
-- Tray menu: status (connected / disconnected), Settings, Reconnect, Pause/Resume reporting, Open logs folder, Exit. Items are added in the milestone that implements them; the menu never shows placeholder items.
+- Tray menu: status (connected / disconnected), Settings, Reconnect, Pause/Resume reporting, Open logs folder, Exit. Items are added in the milestone that implements them; the menu never shows placeholder items. Until the settings window exists (milestone 9), **Settings** opens `settings.json` in the default editor. **Reconnect** publishes `offline`, disconnects, and connects again immediately.
 - Launching the app while it is already running: the running copy shows a tray balloon ("Smart Home Relay is already running") and the new process exits.
 - "Start with Windows" toggles the per-user `Run` registry value, the same one the installer creates.
 
@@ -454,7 +463,7 @@ Notes:
 | Unit | `Core.Tests` | Module logic, state mapping, command handling, presence derivation, discovery payload generation, config validation, backoff logic, lifecycle orchestration using fake event sources | Every build, any OS |
 | Contract | `Core.Tests` | All registered modules: entity keys unique, discovery payloads valid, every command entity has a handler, disabled features clear their discovery | Every build |
 | Snapshot | `Core.Tests` | Discovery JSON for each entity compared against approved JSON files checked into the repo, so accidental changes are caught | Every build |
-| Integration (MQTT) | `Core.Tests` (tagged `MqttBroker`) | Real Mosquitto broker: connect, LWT, discovery, command round trip, reconnect. Runs in a separate `ubuntu-latest` CI job with a Mosquitto service container, because Windows runners cannot run Linux containers | CI (Linux job), optional locally |
+| Integration (MQTT) | `Core.Tests` (tagged `MqttBroker`) | Real Mosquitto broker: connect, LWT, discovery, command round trip, reconnect. Runs in a separate `ubuntu-latest` CI job with Mosquitto installed on the runner, because Windows runners cannot run Linux containers. Locally they use `SHR_TEST_MQTT_HOST`/`SHR_TEST_MQTT_PORT` (default `localhost:1883`) and skip if no broker answers; `SHR_REQUIRE_MQTT_BROKER=1` (set in CI) turns a missing broker into a failure. They use `shrtest` topic prefixes so they can never create entities in a real HA, but should still be pointed at a throwaway broker | CI (Linux job), optional locally |
 | Integration (Windows) | `Platform.Tests` (tagged `Windows`) | Real implementations of idle time, audio, metrics against the actual OS. Never run destructive actions (shutdown, sleep) | CI on `windows-latest` |
 | Architecture | `Core.Tests` | `Core` has no references to Windows or WinForms assemblies | Every build |
 
@@ -499,7 +508,7 @@ Conventions:
 
 - Serilog rolling file in `%LOCALAPPDATA%\SmartHomeRelay\logs\` (daily, 14 days retained, size capped).
 - Default level `Information`; `Debug` selectable in settings for troubleshooting.
-- Tray menu "Open logs folder". Tray tooltip and icon reflect connection state (connected / reconnecting / error).
+- Tray menu "Open logs folder". Tray tooltip and icon reflect connection state: normal icon when connected, amber badge while not configured, connecting, or reconnecting, red badge for a settings or connection error.
 
 ---
 
@@ -577,6 +586,8 @@ Conventions:
 - Until milestone 9, settings are edited in `settings.json` directly: it opens on first run, and a plain `password` field is encrypted automatically.
 - The settings window stays in milestone 9. Editable topic settings are a later enhancement (5.7).
 - MQTT broker integration tests run in a Linux CI job.
+- MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
+- Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).
 
 **Open**
 

@@ -5,7 +5,9 @@ using Serilog.Core;
 using Serilog.Extensions.Logging;
 using SmartHomeRelay.App.Logging;
 using SmartHomeRelay.App.Tray;
+using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
+using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Platform.Windows;
 using SmartHomeRelay.Platform.Windows.Configuration;
 using SmartHomeRelay.Platform.Windows.Hosting;
@@ -41,10 +43,15 @@ internal static class Program
         builder.Logging.AddProvider(new SerilogLoggerProvider(SerilogSetup.CreateLogger(paths.LogsDirectory, levelSwitch), dispose: true));
 
         builder.Services.AddSingleton(levelSwitch);
+        builder.Services.AddSingleton<TrayNotifier>();
+        builder.Services.AddSingleton<IUserNotifier>(sp => sp.GetRequiredService<TrayNotifier>());
         builder.Services.AddWindowsPlatform(paths, singleInstance);
         builder.Services.AddRelaySettings(builder.Configuration);
         builder.Services.AddHostedService<LogLevelSynchronizer>();
+        builder.Services.AddRelayMqtt();
         builder.Services.AddSingleton<TrayApplicationContext>();
+
+        // Feature modules: one line each (spec 13), added from milestone 4 on.
 
         using var host = builder.Build();
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SmartHomeRelay.App");

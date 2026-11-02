@@ -65,10 +65,11 @@ public sealed class SettingsValidator
         {
             errors.Add("device.id is required.");
         }
-        else if (device.Id.Any(c => char.IsWhiteSpace(c) || c is '/' or '+' or '#'))
+        else if (!device.Id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
         {
-            // The ID is a single topic level, so it cannot contain separators or wildcards.
-            errors.Add("device.id must not contain spaces, '/', '+', or '#'.");
+            // The ID is a topic level and the node_id in HA discovery topics, which HA restricts to
+            // [a-zA-Z0-9_-]. Windows host names already fit.
+            errors.Add("device.id may only contain letters, digits, '-', and '_'.");
         }
 
         if (string.IsNullOrWhiteSpace(device.Name))

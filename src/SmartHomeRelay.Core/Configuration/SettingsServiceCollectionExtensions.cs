@@ -10,7 +10,9 @@ public static class SettingsServiceCollectionExtensions
     /// <summary>
     /// Binds <see cref="AppSettings"/> to <paramref name="configuration"/> and registers validation,
     /// the store, <see cref="ISettingsState"/>, and first-run file creation.
-    /// Requires an <see cref="Abstractions.IHostNameProvider"/> and <see cref="Abstractions.IAppPaths"/>.
+    /// Requires the platform's <see cref="Abstractions.IHostNameProvider"/>, <see cref="Abstractions.IAppPaths"/>,
+    /// <see cref="Abstractions.IShellLauncher"/>, <see cref="Abstractions.IUserNotifier"/>, and
+    /// <see cref="Abstractions.ISecretProtector"/>.
     /// </summary>
     public static IServiceCollection AddRelaySettings(this IServiceCollection services, IConfiguration configuration)
     {
@@ -28,6 +30,7 @@ public static class SettingsServiceCollectionExtensions
         // Order matters: the state is evaluated before the initializer decides whether to write defaults.
         services.AddHostedService(sp => sp.GetRequiredService<SettingsState>());
         services.AddHostedService<SettingsFileInitializer>();
+        services.AddHostedService<PlainPasswordEncryptor>();
 
         return services;
     }

@@ -28,6 +28,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\SmartHomeRelay.ico" LogicalName="SmartHomeRelay.ico" />
+    <EmbeddedResource Include="Resources\SmartHomeRelayWarning.ico" LogicalName="SmartHomeRelayWarning.ico" />
+    <EmbeddedResource Include="Resources\SmartHomeRelayError.ico" LogicalName="SmartHomeRelayError.ico" />
   </ItemGroup>
 
 </Project>

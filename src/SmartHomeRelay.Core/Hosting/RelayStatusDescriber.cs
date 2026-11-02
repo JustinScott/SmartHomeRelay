@@ -2,10 +2,12 @@ using SmartHomeRelay.Core.Configuration;
 
 namespace SmartHomeRelay.Core.Hosting;
 
-/// <summary>Derives the tray status and its text, so the tray itself holds no logic.</summary>
+/// <summary>Derives the tray status, text, and severity, so the tray itself holds no logic.</summary>
 public static class RelayStatusDescriber
 {
-    /// <summary>Status implied by the settings alone (before any connection attempt).</summary>
+    /// <summary>
+    /// Status implied by the settings alone: <see cref="RelayStatus.Disconnected"/> means "ready to connect".
+    /// </summary>
     public static RelayStatus FromSettings(SettingsSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -24,6 +26,18 @@ public static class RelayStatusDescriber
         RelayStatus.NotConfigured => "Not configured",
         RelayStatus.SettingsInvalid => "Settings error (see log)",
         RelayStatus.Disconnected => "Not connected",
+        RelayStatus.Connecting => "Connecting",
+        RelayStatus.Connected => "Connected",
+        RelayStatus.Reconnecting => "Reconnecting",
+        RelayStatus.Error => "Connection error (see log)",
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unknown status."),
+    };
+
+    /// <summary>Which tray icon to show.</summary>
+    public static StatusSeverity Severity(RelayStatus status) => status switch
+    {
+        RelayStatus.Connected => StatusSeverity.Ok,
+        RelayStatus.SettingsInvalid or RelayStatus.Error => StatusSeverity.Error,
+        _ => StatusSeverity.Warning,
     };
 }
