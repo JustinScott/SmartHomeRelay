@@ -80,4 +80,32 @@ public sealed class EntityValidatorTests
     {
         EntityValidator.Validate([new("uptime", " ", EntityComponent.Sensor)]).ShouldHaveSingleItem().ShouldContain("no name");
     }
+
+    [Fact]
+    public void Validate_AvailableWhen_SiblingStatus_IsValid()
+    {
+        EntityDescriptor[] entities =
+        [
+            new("cpu_temperature", "CPU temperature", EntityComponent.Sensor) { AvailableWhen = new EntityAvailability("hardware_status", ["ok"]) },
+            new("hardware_status", "Hardware status", EntityComponent.Sensor),
+        ];
+
+        EntityValidator.Validate(entities).ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("missing", "ok")]
+    [InlineData("press", "ok")] // a button has no state
+    [InlineData("hardware_status", "OK'; drop")] // ends up in a Jinja template
+    public void Validate_AvailableWhen_Invalid(string statusKey, string state)
+    {
+        EntityDescriptor[] entities =
+        [
+            new("cpu_temperature", "CPU temperature", EntityComponent.Sensor) { AvailableWhen = new EntityAvailability(statusKey, [state]) },
+            new("hardware_status", "Hardware status", EntityComponent.Sensor),
+            new("press", "Press", EntityComponent.Button) { CommandHandler = s_noop },
+        ];
+
+        EntityValidator.Validate(entities).ShouldNotBeEmpty();
+    }
 }

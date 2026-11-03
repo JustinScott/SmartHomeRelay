@@ -16,6 +16,8 @@ public sealed class SettingsValidator
     internal const int MaxImageTimeoutSeconds = 120;
     internal const long MaxImageMaxBytes = 100L * 1024 * 1024;
     internal const int MaxShutdownDelaySeconds = 600;
+    internal const int MinHardwareIntervalSeconds = 5;
+    internal const int MaxHardwareIntervalSeconds = 3_600;
 
     private static readonly char[] s_topicWildcards = ['+', '#'];
 
@@ -114,6 +116,45 @@ public sealed class SettingsValidator
             1,
             MaxImageMaxBytes,
             errors);
+
+        ValidateHardware(features.Hardware, errors);
+    }
+
+    private static void ValidateHardware(HardwareSettings hardware, List<string> errors)
+    {
+        ValidateRange("features.hardware.port", hardware.Port, 1, 65_535, errors);
+        ValidateRange(
+            "features.hardware.intervalSeconds",
+            hardware.IntervalSeconds,
+            MinHardwareIntervalSeconds,
+            MaxHardwareIntervalSeconds,
+            errors);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var key in hardware.Sensors ?? [])
+        {
+            if (!Features.Hardware.HardwareKeys.IsSensorKey(key))
+            {
+                errors.Add($"features.hardware.sensors: unknown sensor '{key}'. Known: {string.Join(", ", Features.Hardware.HardwareKeys.SensorKeys)}.");
+            }
+            else if (!seen.Add(key))
+            {
+                errors.Add($"features.hardware.sensors lists '{key}' more than once.");
+            }
+        }
+
+        foreach (var (key, sensorId) in hardware.SensorOverrides)
+        {
+            if (!Features.Hardware.HardwareKeys.IsSensorKey(key))
+            {
+                errors.Add($"features.hardware.sensorOverrides: unknown sensor '{key}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(sensorId) || !sensorId.StartsWith('/') || sensorId.Any(char.IsWhiteSpace))
+            {
+                errors.Add($"features.hardware.sensorOverrides.{key} must be a LibreHardwareMonitor sensor ID such as /lpc/nct6798d/0/fan/1.");
+            }
+        }
     }
 
     private static void ValidateTopic(string name, string value, List<string> errors)

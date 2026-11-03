@@ -30,6 +30,9 @@ public sealed record EntityDescriptor(string Key, string Name, EntityComponent C
     /// <summary>Range for a <see cref="EntityComponent.Number"/>. Required for numbers.</summary>
     public NumberRange? Range { get; init; }
 
+    /// <summary>Optional extra availability condition; null means available whenever the device is online.</summary>
+    public EntityAvailability? AvailableWhen { get; init; }
+
     /// <summary>Whether state messages are retained (sensors yes; spec 4.3).</summary>
     public bool RetainState { get; init; } = true;
 

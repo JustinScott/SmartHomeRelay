@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Hardware;
 using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
@@ -26,6 +27,7 @@ public sealed class ModuleContractTests
             new PresenceModule(new FakeSystemEventSource(), sources, sources, settings, TimeProvider.System),
             new PowerModule(power, power, settings, TimeProvider.System),
             new MetricsModule(new FakeMetricsSource(), settings, TimeProvider.System),
+            new HardwareModule(new FakeLhmEndpoint(), settings, new FakeSecretProtector(), new FakeUserNotifier(), TimeProvider.System),
         ];
     }
 
@@ -71,6 +73,7 @@ public sealed class ModuleContractTests
         allOff.Features.Audio.Enabled = false;
         allOff.Features.Metrics.Enabled = false;
         allOff.Features.Notifications.Enabled = false;
+        allOff.Features.Hardware.Enabled = false;
 
         foreach (var module in AllModules())
         {

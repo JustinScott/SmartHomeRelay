@@ -39,6 +39,7 @@ Instructions for AI coding agents working on **Smart Home Relay**: a Windows tra
 - **Never hardcode** credentials, IPs, or host names. Settings only; the password is DPAPI-encrypted.
 - **Never rename a shipped entity key or MQTT topic.** Existing Home Assistant automations depend on them. The `shr/{host}/status` and `shr/{host}/commands/notification` topics and the notification field names (`Title`, `Message`, `HeroImageURL`, `ActivationURL`, `Audio`, `Buttons`) are a compatibility contract.
 - **URLs from MQTT payloads must be `http` or `https` only.** Never read local files or paths named in a payload.
+- **LibreHardwareMonitor is read-only and loopback-only** (spec 5.8): only `GET http://127.0.0.1:{port}/data.json`, after the anti-spoofing checks. Never call its other endpoints, never make the host configurable, and never publish a value that failed validation.
 - **Publish `offline` before any clean MQTT disconnect** (suspend, shutdown). A clean disconnect does not trigger the last-will message.
 - Destructive power commands (shutdown, restart, hibernate, sign out) stay disabled by default.
 - Never run destructive OS actions in tests. Use fakes.
@@ -59,4 +60,4 @@ The second command runs the fast unit tests. The third adds the Windows-only int
 
 ## Out of scope for v1
 
-Linux/macOS, Windows Service host, TLS, auto-update, brightness control, hardware temperatures or anything needing admin, Frigate support, arbitrary command execution from MQTT. See spec sections 1.2 and 5.7.
+Linux/macOS, Windows Service host, TLS, auto-update, brightness control, reading hardware sensors that need admin or a driver directly (CPU temperature and fans come only from a user-managed LibreHardwareMonitor, read-only, spec 5.8), Frigate support, arbitrary command execution from MQTT. See spec sections 1.2, 5.7 and 5.8.

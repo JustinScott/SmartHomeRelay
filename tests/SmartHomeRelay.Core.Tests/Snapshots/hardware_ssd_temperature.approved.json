@@ -1,0 +1,37 @@
+{
+  "name": "SSD temperature",
+  "unique_id": "desktop_abc123_ssd_temperature",
+  "has_entity_name": true,
+  "availability": [
+    {
+      "topic": "shr/DESKTOP-ABC123/status",
+      "payload_available": "online",
+      "payload_not_available": "offline"
+    },
+    {
+      "topic": "shr/DESKTOP-ABC123/hardware_status/state",
+      "value_template": "{{ \u0027online\u0027 if value in [\u0027ok\u0027, \u0027newer_than_tested\u0027] else \u0027offline\u0027 }}",
+      "payload_available": "online",
+      "payload_not_available": "offline"
+    }
+  ],
+  "availability_mode": "all",
+  "state_topic": "shr/DESKTOP-ABC123/ssd_temperature/state",
+  "device_class": "temperature",
+  "unit_of_measurement": "\u00B0C",
+  "state_class": "measurement",
+  "icon": "mdi:harddisk",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

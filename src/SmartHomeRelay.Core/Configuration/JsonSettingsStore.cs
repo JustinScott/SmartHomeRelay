@@ -37,21 +37,38 @@ public sealed class JsonSettingsStore(IAppPaths paths) : ISettingsStore
     }
 
     /// <summary>
-    /// Adds an always-empty <c>"password": ""</c> right after <c>username</c>. Without it, users editing the
+    /// Adds an always-empty <c>"password": ""</c> right after <c>username</c> (MQTT and hardware). Without it, users editing the
     /// file by hand typed their password into <c>passwordProtected</c>, which only holds encrypted values.
     /// The plain password itself is never serialized.
     /// </summary>
     private static JsonObject WithPasswordPlaceholder(JsonObject root)
     {
-        if (root["mqtt"] is not JsonObject mqtt)
+        if (root["mqtt"] is JsonObject mqtt)
         {
-            return root;
+            root["mqtt"] = WithPlaceholder(mqtt);
         }
 
-        var ordered = new JsonObject();
-        foreach (var (key, value) in mqtt.ToList())
+        // The LibreHardwareMonitor web server password (spec 5.8) works the same way.
+        if (root["features"] is JsonObject features && features["hardware"] is JsonObject hardware)
         {
-            mqtt.Remove(key);
+            // Spell out the default sensor list so users can see what to edit.
+            if (hardware["sensors"] is null)
+            {
+                hardware["sensors"] = new JsonArray([.. HardwareSettings.DefaultSensors.Select(s => JsonValue.Create(s))]);
+            }
+
+            features["hardware"] = WithPlaceholder(hardware);
+        }
+
+        return root;
+    }
+
+    private static JsonObject WithPlaceholder(JsonObject section)
+    {
+        var ordered = new JsonObject();
+        foreach (var (key, value) in section.ToList())
+        {
+            section.Remove(key);
             ordered[key] = value;
             if (key == "username")
             {
@@ -59,8 +76,7 @@ public sealed class JsonSettingsStore(IAppPaths paths) : ISettingsStore
             }
         }
 
-        root["mqtt"] = ordered;
-        return root;
+        return ordered;
     }
 
     /// <inheritdoc />

@@ -46,7 +46,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
             ignoreOrder: false);
         PropertyNames(root.GetProperty("device")).ShouldBe(["id", "name"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features")).ShouldBe(
-            ["presence", "power", "display", "audio", "metrics", "notifications"],
+            ["presence", "power", "display", "audio", "metrics", "notifications", "hardware"],
             ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("presence")).ShouldBe(["enabled", "idleThresholdSeconds"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("power")).ShouldBe(
@@ -56,7 +56,30 @@ public sealed class JsonSettingsStoreTests : IDisposable
         PropertyNames(root.GetProperty("features").GetProperty("notifications")).ShouldBe(
             ["enabled", "imageDownloadTimeoutSeconds", "imageMaxBytes"],
             ignoreOrder: true);
+        PropertyNames(root.GetProperty("features").GetProperty("hardware")).ShouldBe(
+            ["enabled", "port", "username", "password", "passwordProtected", "intervalSeconds", "sensors", "sensorOverrides"],
+            ignoreOrder: false);
+        root.GetProperty("features").GetProperty("hardware").GetProperty("sensors").EnumerateArray().Select(e => e.GetString())
+            .ShouldBe(["cpu_temperature", "cpu_fan", "ssd_temperature"]);
         root.GetProperty("logLevel").GetString().ShouldBe("Information");
+    }
+
+    [Fact]
+    public async Task SaveAsync_HardwarePassword_IsWrittenAsEmptyPlaceholderOnly()
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Hardware.Username = "relay";
+        settings.Features.Hardware.Password = "lhm-secret";
+        settings.Features.Hardware.PasswordProtected = "enc:xyz";
+
+        await _store.SaveAsync(settings, TestContext.Current.CancellationToken);
+
+        var text = await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken);
+        text.ShouldNotContain("lhm-secret");
+        using var document = JsonDocument.Parse(text);
+        var hardware = document.RootElement.GetProperty("features").GetProperty("hardware");
+        hardware.GetProperty("password").GetString().ShouldBe(string.Empty);
+        hardware.GetProperty("passwordProtected").GetString().ShouldBe("enc:xyz");
     }
 
     [Fact]

@@ -238,4 +238,48 @@ public sealed class SettingsValidatorTests
         errors.Count.ShouldBe(1, string.Join(Environment.NewLine, errors));
         errors[0].ShouldStartWith(jsonPath + " ");
     }
+
+    [Fact]
+    public void Validate_HardwareDefaults_AreValid()
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Hardware.Enabled = true;
+
+        new SettingsValidator().Validate(settings).ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(0, "features.hardware.port")]
+    [InlineData(70_000, "features.hardware.port")]
+    public void Validate_HardwarePortOutOfRange(int port, string error)
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Hardware.Port = port;
+
+        new SettingsValidator().Validate(settings).ShouldContain(e => e.StartsWith(error, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_HardwareUnknownOrDuplicateSensor()
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Hardware.Sensors = ["cpu_temperature", "gpu_hotspot", "cpu_temperature"];
+
+        var errors = new SettingsValidator().Validate(settings);
+
+        errors.ShouldContain(e => e.Contains("unknown sensor 'gpu_hotspot'", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("'cpu_temperature' more than once", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("cpu_fan", "fan/1")]
+    [InlineData("cpu_fan", "/lpc/x 0/fan/1")]
+    [InlineData("case_fan", "/lpc/nct6798d/0/fan/1")]
+    public void Validate_HardwareBadOverride(string key, string sensorId)
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.Hardware.SensorOverrides[key] = sensorId;
+
+        new SettingsValidator().Validate(settings).ShouldContain(e => e.StartsWith("features.hardware.sensorOverrides", StringComparison.Ordinal));
+    }
 }

@@ -8,12 +8,14 @@ using SmartHomeRelay.App.Tray;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Hardware;
 using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Platform.Windows;
 using SmartHomeRelay.Platform.Windows.Configuration;
+using SmartHomeRelay.Platform.Windows.Hardware;
 using SmartHomeRelay.Platform.Windows.Hosting;
 using SmartHomeRelay.Platform.Windows.Metrics;
 using SmartHomeRelay.Platform.Windows.Power;
@@ -72,6 +74,10 @@ internal static class Program
         // Metrics (spec 5.5)
         builder.Services.AddSingleton<ISystemMetricsSource, WindowsSystemMetricsSource>();
         builder.Services.AddSingleton<IFeatureModule, MetricsModule>();
+
+        // Hardware sensors from a user-managed LibreHardwareMonitor (spec 5.8)
+        builder.Services.AddSingleton<ILibreHardwareMonitorEndpoint, WindowsLibreHardwareMonitorEndpoint>();
+        builder.Services.AddSingleton<IFeatureModule, HardwareModule>();
 
         using var host = builder.Build();
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SmartHomeRelay.App");

@@ -47,6 +47,21 @@ public static class EntityValidator
             {
                 errors.Add($"Entity '{entity.Key}' has an invalid range.");
             }
+
+            if (entity.AvailableWhen is { } availability)
+            {
+                var status = entities.FirstOrDefault(e => e.Key == availability.StatusKey);
+                if (status is null || !status.HasState || status.Key == entity.Key || status.AvailableWhen is not null)
+                {
+                    errors.Add($"Entity '{entity.Key}' depends on '{availability.StatusKey}', which must be another entity of the same module with a state and no availability condition of its own.");
+                }
+
+                // The states end up inside a Jinja template in the discovery config: allow only plain words.
+                if (availability.AvailableStates.Count == 0 || !availability.AvailableStates.All(IsValidKey))
+                {
+                    errors.Add($"Entity '{entity.Key}' has invalid available states; use lowercase letters, digits, and underscores.");
+                }
+            }
         }
 
         return errors;

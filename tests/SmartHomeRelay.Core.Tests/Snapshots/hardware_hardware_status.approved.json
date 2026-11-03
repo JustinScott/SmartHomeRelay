@@ -1,0 +1,33 @@
+{
+  "name": "Hardware status",
+  "unique_id": "desktop_abc123_hardware_status",
+  "has_entity_name": true,
+  "availability_topic": "shr/DESKTOP-ABC123/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "state_topic": "shr/DESKTOP-ABC123/hardware_status/state",
+  "device_class": "enum",
+  "icon": "mdi:chip",
+  "entity_category": "diagnostic",
+  "options": [
+    "ok",
+    "newer_than_tested",
+    "not_running",
+    "login_failed",
+    "untrusted",
+    "incompatible"
+  ],
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

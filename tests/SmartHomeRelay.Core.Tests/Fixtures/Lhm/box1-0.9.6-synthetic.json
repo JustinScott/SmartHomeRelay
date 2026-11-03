@@ -1,0 +1,424 @@
+{
+ "id": 34,
+ "Text": "Sensor",
+ "Min": "Min",
+ "Value": "Value",
+ "Max": "Max",
+ "ImageURL": "",
+ "Children": [
+  {
+   "id": 33,
+   "Text": "BOX1",
+   "Min": "",
+   "Value": "",
+   "Max": "",
+   "ImageURL": "images_icon/computer.png",
+   "Children": [
+    {
+     "id": 10,
+     "Text": "ASUS ROG STRIX X570-E GAMING",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/motherboard",
+     "ImageURL": "images_icon/mainboard.png",
+     "Children": [
+      {
+       "id": 9,
+       "Text": "Nuvoton NCT6798D",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "HardwareId": "/lpc/nct6798d/0",
+       "ImageURL": "images_icon/chip.png",
+       "Children": [
+        {
+         "id": 2,
+         "Text": "Temperatures",
+         "Min": "",
+         "Value": "",
+         "Max": "",
+         "ImageURL": "images_icon/temperature.png",
+         "Children": [
+          {
+           "id": 0,
+           "Text": "CPU",
+           "Min": "44.0 °C",
+           "Value": "44.0 °C",
+           "Max": "44.0 °C",
+           "SensorId": "/lpc/nct6798d/0/temperature/0",
+           "Type": "Temperature",
+           "RawMin": "44.0 °C",
+           "RawValue": "44.0 °C",
+           "RawMax": "44.0 °C",
+           "ImageURL": "images/transparent.png",
+           "Children": []
+          },
+          {
+           "id": 1,
+           "Text": "Motherboard",
+           "Min": "31.0 °C",
+           "Value": "31.0 °C",
+           "Max": "31.0 °C",
+           "SensorId": "/lpc/nct6798d/0/temperature/1",
+           "Type": "Temperature",
+           "RawMin": "31.0 °C",
+           "RawValue": "31.0 °C",
+           "RawMax": "31.0 °C",
+           "ImageURL": "images/transparent.png",
+           "Children": []
+          }
+         ]
+        },
+        {
+         "id": 6,
+         "Text": "Fans",
+         "Min": "",
+         "Value": "",
+         "Max": "",
+         "ImageURL": "images_icon/fan.png",
+         "Children": [
+          {
+           "id": 3,
+           "Text": "Chassis Fan #1",
+           "Min": "0 RPM",
+           "Value": "0 RPM",
+           "Max": "0 RPM",
+           "SensorId": "/lpc/nct6798d/0/fan/0",
+           "Type": "Fan",
+           "RawMin": "0 RPM",
+           "RawValue": "0 RPM",
+           "RawMax": "0 RPM",
+           "ImageURL": "images/transparent.png",
+           "Children": []
+          },
+          {
+           "id": 4,
+           "Text": "CPU Fan",
+           "Min": "1250 RPM",
+           "Value": "1250 RPM",
+           "Max": "1250 RPM",
+           "SensorId": "/lpc/nct6798d/0/fan/1",
+           "Type": "Fan",
+           "RawMin": "1250 RPM",
+           "RawValue": "1250 RPM",
+           "RawMax": "1250 RPM",
+           "ImageURL": "images/transparent.png",
+           "Children": []
+          },
+          {
+           "id": 5,
+           "Text": "Chassis Fan #2",
+           "Min": "812 RPM",
+           "Value": "812 RPM",
+           "Max": "812 RPM",
+           "SensorId": "/lpc/nct6798d/0/fan/2",
+           "Type": "Fan",
+           "RawMin": "812 RPM",
+           "RawValue": "812 RPM",
+           "RawMax": "812 RPM",
+           "ImageURL": "images/transparent.png",
+           "Children": []
+          }
+         ]
+        },
+        {
+         "id": 8,
+         "Text": "Controls",
+         "Min": "",
+         "Value": "",
+         "Max": "",
+         "ImageURL": "images_icon/control.png",
+         "Children": [
+          {
+           "id": 7,
+           "Text": "CPU Fan",
+           "Min": "38.0 %",
+           "Value": "38.0 %",
+           "Max": "38.0 %",
+           "SensorId": "/lpc/nct6798d/0/control/1",
+           "Type": "Control",
+           "RawMin": "38.0 %",
+           "RawValue": "38.0 %",
+           "RawMax": "38.0 %",
+           "ImageURL": "images/transparent.png",
+           "Children": []
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": 18,
+     "Text": "AMD Ryzen 7 5800X3D",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/amdcpu/0",
+     "ImageURL": "images_icon/cpu.png",
+     "Children": [
+      {
+       "id": 13,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 11,
+         "Text": "Core (Tctl/Tdie)",
+         "Min": "47.3 °C",
+         "Value": "47.3 °C",
+         "Max": "47.3 °C",
+         "SensorId": "/amdcpu/0/temperature/2",
+         "Type": "Temperature",
+         "RawMin": "47.3 °C",
+         "RawValue": "47.3 °C",
+         "RawMax": "47.3 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 12,
+         "Text": "CCD1 (Tdie)",
+         "Min": "45.8 °C",
+         "Value": "45.8 °C",
+         "Max": "45.8 °C",
+         "SensorId": "/amdcpu/0/temperature/3",
+         "Type": "Temperature",
+         "RawMin": "45.8 °C",
+         "RawValue": "45.8 °C",
+         "RawMax": "45.8 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 15,
+       "Text": "Load",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/load.png",
+       "Children": [
+        {
+         "id": 14,
+         "Text": "CPU Total",
+         "Min": "6.2 %",
+         "Value": "6.2 %",
+         "Max": "6.2 %",
+         "SensorId": "/amdcpu/0/load/0",
+         "Type": "Load",
+         "RawMin": "6.2 %",
+         "RawValue": "6.2 %",
+         "RawMax": "6.2 %",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 17,
+       "Text": "Powers",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/power.png",
+       "Children": [
+        {
+         "id": 16,
+         "Text": "Package",
+         "Min": "56.1 W",
+         "Value": "56.1 W",
+         "Max": "56.1 W",
+         "SensorId": "/amdcpu/0/power/0",
+         "Type": "Power",
+         "RawMin": "56.1 W",
+         "RawValue": "56.1 W",
+         "RawMax": "56.1 W",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": 22,
+     "Text": "AMD Radeon RX 6800 XT",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/gpu-amd/0",
+     "ImageURL": "images_icon/amd.png",
+     "Children": [
+      {
+       "id": 21,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 19,
+         "Text": "GPU Core",
+         "Min": "47.0 °C",
+         "Value": "47.0 °C",
+         "Max": "47.0 °C",
+         "SensorId": "/gpu-amd/0/temperature/0",
+         "Type": "Temperature",
+         "RawMin": "47.0 °C",
+         "RawValue": "47.0 °C",
+         "RawMax": "47.0 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 20,
+         "Text": "GPU Hot Spot",
+         "Min": " °C",
+         "Value": " °C",
+         "Max": " °C",
+         "SensorId": "/gpu-amd/0/temperature/2",
+         "Type": "Temperature",
+         "RawMin": " °C",
+         "RawValue": " °C",
+         "RawMax": " °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": 29,
+     "Text": "Samsung SSD 980 PRO 1TB",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/nvme/0",
+     "ImageURL": "images_icon/nvme.png",
+     "Children": [
+      {
+       "id": 26,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 23,
+         "Text": "Composite Temperature",
+         "Min": "38.0 °C",
+         "Value": "38.0 °C",
+         "Max": "38.0 °C",
+         "SensorId": "/nvme/0/temperature/0",
+         "Type": "Temperature",
+         "RawMin": "38.0 °C",
+         "RawValue": "38.0 °C",
+         "RawMax": "38.0 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 24,
+         "Text": "Temperature #1",
+         "Min": "38.0 °C",
+         "Value": "38.0 °C",
+         "Max": "38.0 °C",
+         "SensorId": "/nvme/0/temperature/1",
+         "Type": "Temperature",
+         "RawMin": "38.0 °C",
+         "RawValue": "38.0 °C",
+         "RawMax": "38.0 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        },
+        {
+         "id": 25,
+         "Text": "Warning Temperature",
+         "Min": "82.0 °C",
+         "Value": "82.0 °C",
+         "Max": "82.0 °C",
+         "SensorId": "/nvme/0/temperature/10",
+         "Type": "Temperature",
+         "RawMin": "82.0 °C",
+         "RawValue": "82.0 °C",
+         "RawMax": "82.0 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      },
+      {
+       "id": 28,
+       "Text": "Data",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/data.png",
+       "Children": [
+        {
+         "id": 27,
+         "Text": "Data Read",
+         "Min": "12345.6 GB",
+         "Value": "12345.6 GB",
+         "Max": "12345.6 GB",
+         "SensorId": "/nvme/0/data/0",
+         "Type": "Data",
+         "RawMin": "12345.6 GB",
+         "RawValue": "12345.6 GB",
+         "RawMax": "12345.6 GB",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": 32,
+     "Text": "WDC WD40EFRX-68N32N0",
+     "Min": "",
+     "Value": "",
+     "Max": "",
+     "HardwareId": "/hdd/1",
+     "ImageURL": "images_icon/hdd.png",
+     "Children": [
+      {
+       "id": 31,
+       "Text": "Temperatures",
+       "Min": "",
+       "Value": "",
+       "Max": "",
+       "ImageURL": "images_icon/temperature.png",
+       "Children": [
+        {
+         "id": 30,
+         "Text": "Temperature",
+         "Min": "33.0 °C",
+         "Value": "33.0 °C",
+         "Max": "33.0 °C",
+         "SensorId": "/hdd/1/temperature/0",
+         "Type": "Temperature",
+         "RawMin": "33.0 °C",
+         "RawValue": "33.0 °C",
+         "RawMax": "33.0 °C",
+         "ImageURL": "images/transparent.png",
+         "Children": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

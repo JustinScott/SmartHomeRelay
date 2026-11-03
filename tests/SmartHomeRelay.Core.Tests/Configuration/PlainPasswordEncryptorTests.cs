@@ -38,6 +38,29 @@ public sealed class PlainPasswordEncryptorTests : IDisposable
     }
 
     [Fact]
+    public async Task Start_PlainHardwarePassword_IsEncryptedAndRemovedFromFile()
+    {
+        // Spec 5.8: LibreHardwareMonitor's web server password works like the MQTT password.
+        _paths.WriteSettingsFile("""
+            {
+              "mqtt": { "host": "broker.local", "passwordProtected": "enc:c2VjcmV0" },
+              "features": { "hardware": { "enabled": true, "username": "relay", "password": "lhm-pass" } }
+            }
+            """);
+        using var context = new SettingsTestContext(_paths);
+        await context.State.StartAsync(TestContext.Current.CancellationToken);
+
+        await Encryptor(context).StartAsync(TestContext.Current.CancellationToken);
+
+        var text = await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken);
+        text.ShouldNotContain("lhm-pass");
+        using var document = JsonDocument.Parse(text);
+        var hardware = document.RootElement.GetProperty("features").GetProperty("hardware");
+        new FakeSecretProtector().Unprotect(hardware.GetProperty("passwordProtected").GetString()!).ShouldBe("lhm-pass");
+        document.RootElement.GetProperty("mqtt").GetProperty("passwordProtected").GetString().ShouldBe("enc:c2VjcmV0", "the MQTT password is left alone");
+    }
+
+    [Fact]
     public async Task Start_NoPlainPassword_LeavesFileUntouched()
     {
         const string original = """{ "mqtt": { "host": "broker.local", "passwordProtected": "enc:c2VjcmV0" } }""";

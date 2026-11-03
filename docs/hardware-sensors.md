@@ -1,6 +1,6 @@
 # Hardware sensors (CPU temperature, fans) with LibreHardwareMonitor
 
-> **Status: planned.** This describes the Hardware feature in [spec section 5.8](../spec.md). It is not in a release yet.
+> This is the Hardware feature in [spec section 5.8](../spec.md), part of milestone 6 (Metrics).
 
 Windows doesn't let a standard user read CPU temperature or motherboard fan speeds; that takes a kernel driver. Smart Home Relay never runs as admin, so it gets those readings from **LibreHardwareMonitor (LHM)**, which you install and manage. Smart Home Relay reads LHM's data on your own PC and publishes it on the same Home Assistant device as everything else.
 
@@ -87,7 +87,7 @@ Don't create a URL reservation (`netsh http add urlacl`) for this port. LHM does
 
 ## 5. Block the web server from your network
 
-Smart Home Relay only needs the web server on this PC. Block it from everything else (admin PowerShell; use your port if you changed it):
+Smart Home Relay only needs the web server on this PC. LHM can't be set to listen on this PC only (it listens on every network interface), so block the port from everything else (admin PowerShell; use your port if you changed it):
 
 ```powershell
 New-NetFirewallRule -DisplayName 'LibreHardwareMonitor web server (block network)' `
@@ -106,16 +106,39 @@ Open `settings.json` (tray menu → **Settings**) and set:
   "port": 8085,
   "username": "the LHM username",
   "password": "the LHM password",
-  "sensors": ["cpu_temperature", "cpu_fan", "ssd_temperature"]
+  "intervalSeconds": 30,
+  "sensors": ["cpu_temperature", "cpu_fan", "ssd_temperature"],
+  "sensorOverrides": {}
 }
 ```
 
-When you save, Smart Home Relay encrypts the password (Windows DPAPI) and removes the plain text from the file, the same as the MQTT password. There is no host setting: LHM is always read on `127.0.0.1`.
+When you save, Smart Home Relay encrypts the password (Windows DPAPI) and removes the plain text from the file, the same as the MQTT password. There is no host setting: LHM is always read on `127.0.0.1`. Changes to `sensors` apply after you restart Smart Home Relay.
+
+| Sensor | What it reads |
+|---|---|
+| `cpu_temperature` | The CPU's own package temperature (AMD "Core (Tctl/Tdie)", Intel "CPU Package") |
+| `cpu_fan` | The motherboard fan LHM names "CPU Fan" (or anything with "CPU" in its name) |
+| `ssd_temperature` | The drive Windows is installed on |
+
+### If a sensor shows "Unknown"
+
+The built-in rule didn't find a match, for example because your motherboard's fans are named "Fan #1", "Fan #2" in LHM. Point the sensor at the right one:
+
+1. Open <http://127.0.0.1:8085/data.json> in a browser on this PC and sign in.
+2. Find the sensor (e.g. the fan whose RPM matches your CPU cooler) and copy its `SensorId`, such as `/lpc/nct6798d/0/fan/1`.
+3. Add it to `settings.json` and save:
+
+   ```json
+   "sensorOverrides": { "cpu_fan": "/lpc/nct6798d/0/fan/1" }
+   ```
+
+Don't hide the sensors you use in LHM's window; hidden sensors may drop out of its web data.
 
 ## 7. Check it
 
 - The tray status shows no hardware warning.
-- In Home Assistant, the Smart Home Relay device has the new sensors, and the diagnostic **Hardware status** sensor reads `ok`, with the detected LHM version as an attribute.
+- In Home Assistant, the Smart Home Relay device has the new sensors. Under **Diagnostic**, **Hardware status** reads `ok` and **LibreHardwareMonitor version** shows the version being read.
+- If LHM isn't running yet when Smart Home Relay starts, you'll only be told after about two minutes. Both usually start at the same sign-in.
 
 ## Troubleshooting by Hardware status
 
@@ -127,6 +150,8 @@ When you save, Smart Home Relay encrypts the password (Windows DPAPI) and remove
 | `untrusted` | Something other than a trusted LHM owns the port, LHM runs from a folder standard users can write to, or the server didn't ask for the login you configured | Check that LHM is in Program Files (step 1) and that no other program uses the port. Then restart LHM. |
 | `newer_than_tested` | LHM is newer than the tested version, but its data still checks out | Nothing, unless values look wrong. Watch for a Smart Home Relay update. |
 | `incompatible` | LHM is older than 0.9.5, or its data format changed | Install the tested version from the table above |
+
+While the status is anything but `ok` or `newer_than_tested`, the hardware sensors show **Unavailable** in Home Assistant, and Smart Home Relay shows one tray message per new problem.
 
 The Smart Home Relay log (tray menu → **Open logs folder**) names the exact check that failed.
 

@@ -17,6 +17,21 @@ internal static partial class NativeMethods
     /// <summary><c>KMTQAITYPE_ADAPTERPERFDATA</c>: fills a <see cref="D3dkmtAdapterPerfData"/>.</summary>
     public const int KmtqaitypeAdapterPerfData = 62;
 
+    /// <summary><c>AF_INET</c>.</summary>
+    public const int AfInet = 2;
+
+    /// <summary><c>TCP_TABLE_OWNER_PID_LISTENER</c>.</summary>
+    public const int TcpTableOwnerPidListener = 3;
+
+    /// <summary><c>ERROR_INSUFFICIENT_BUFFER</c>.</summary>
+    public const uint ErrorInsufficientBuffer = 122;
+
+    /// <summary><c>PROCESS_QUERY_LIMITED_INFORMATION</c>: allowed for other users' and elevated processes.</summary>
+    public const uint ProcessQueryLimitedInformation = 0x1000;
+
+    /// <summary><c>IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS</c>.</summary>
+    public const uint IoctlVolumeGetVolumeDiskExtents = 0x00560000;
+
     /// <summary>The local server, for the WTS functions.</summary>
     public static readonly nint WtsCurrentServerHandle = 0;
 
@@ -67,4 +82,23 @@ internal static partial class NativeMethods
     /// <summary>Closes an adapter handle from D3DKMTEnumAdapters2. Returns an NTSTATUS (0 = success).</summary>
     [LibraryImport("gdi32.dll")]
     public static partial int D3DKMTCloseAdapter(ref D3dkmtCloseAdapter close);
+
+    /// <summary>Lists TCP listeners with their owning process IDs. Returns a Win32 error code (0 = success).</summary>
+    [LibraryImport("iphlpapi.dll")]
+    public static partial uint GetExtendedTcpTable(nint table, ref int size, [MarshalAs(UnmanagedType.Bool)] bool order, int addressFamily, int tableClass, uint reserved);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    public static partial Microsoft.Win32.SafeHandles.SafeProcessHandle OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint processId);
+
+    [LibraryImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static unsafe partial bool QueryFullProcessImageName(Microsoft.Win32.SafeHandles.SafeProcessHandle process, uint flags, char* buffer, ref int size);
+
+    /// <summary>Opens a volume with no access rights (enough for the disk-extents query).</summary>
+    [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    public static partial Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(string fileName, uint access, uint shareMode, nint securityAttributes, uint creationDisposition, uint flags, nint template);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeviceIoControl(Microsoft.Win32.SafeHandles.SafeFileHandle device, uint controlCode, nint inBuffer, uint inSize, out VolumeDiskExtents outBuffer, uint outSize, out uint bytesReturned, nint overlapped);
 }

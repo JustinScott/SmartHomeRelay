@@ -20,4 +20,7 @@ public sealed class FeaturesSettings
 
     /// <summary>Notifications feature settings.</summary>
     public NotificationsSettings Notifications { get; set; } = new();
+
+    /// <summary>Hardware sensors from LibreHardwareMonitor (spec 5.8). Off by default.</summary>
+    public HardwareSettings Hardware { get; set; } = new();
 }

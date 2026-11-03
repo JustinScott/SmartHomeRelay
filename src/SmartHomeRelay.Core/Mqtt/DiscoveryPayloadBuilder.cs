@@ -44,9 +44,16 @@ public static class DiscoveryPayloadBuilder
             json.WriteString("unique_id", UniqueIds.For(device.Id, entity.Key));
             json.WriteBoolean("has_entity_name", true);
 
-            json.WriteString("availability_topic", topics.Availability);
-            json.WriteString("payload_available", MqttTopics.Online);
-            json.WriteString("payload_not_available", MqttTopics.Offline);
+            if (entity.AvailableWhen is { } availability)
+            {
+                WriteAvailabilityList(json, topics, availability);
+            }
+            else
+            {
+                json.WriteString("availability_topic", topics.Availability);
+                json.WriteString("payload_available", MqttTopics.Online);
+                json.WriteString("payload_not_available", MqttTopics.Offline);
+            }
 
             if (entity.HasState)
             {
@@ -127,6 +134,32 @@ public static class DiscoveryPayloadBuilder
             default:
                 break;
         }
+    }
+
+    /// <summary>
+    /// Device availability plus the status entity's state, both required (<c>availability_mode: all</c>).
+    /// The template maps the status to online/offline; its states are validated as plain words.
+    /// </summary>
+    private static void WriteAvailabilityList(Utf8JsonWriter json, MqttTopics topics, EntityAvailability availability)
+    {
+        json.WriteStartArray("availability");
+
+        json.WriteStartObject();
+        json.WriteString("topic", topics.Availability);
+        json.WriteString("payload_available", MqttTopics.Online);
+        json.WriteString("payload_not_available", MqttTopics.Offline);
+        json.WriteEndObject();
+
+        var states = string.Join(", ", availability.AvailableStates.Select(state => $"'{state}'"));
+        json.WriteStartObject();
+        json.WriteString("topic", topics.State(availability.StatusKey));
+        json.WriteString("value_template", $"{{{{ '{MqttTopics.Online}' if value in [{states}] else '{MqttTopics.Offline}' }}}}");
+        json.WriteString("payload_available", MqttTopics.Online);
+        json.WriteString("payload_not_available", MqttTopics.Offline);
+        json.WriteEndObject();
+
+        json.WriteEndArray();
+        json.WriteString("availability_mode", "all");
     }
 
     private static void WriteOptional(Utf8JsonWriter json, string name, string? value)

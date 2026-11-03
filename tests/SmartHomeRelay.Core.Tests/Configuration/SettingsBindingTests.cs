@@ -39,6 +39,34 @@ public sealed class SettingsBindingTests : IDisposable
     public void Dispose() => _paths.Dispose();
 
     [Fact]
+    public void Bind_HardwareSensors_ReplacesTheDefaultListInsteadOfAppending()
+    {
+        // The configuration binder adds to a list that already has items; the defaults must not leak in.
+        _paths.WriteSettingsFile("""
+            { "features": { "hardware": { "enabled": true, "sensors": ["cpu_fan"], "sensorOverrides": { "cpu_fan": "/lpc/nct6798d/0/fan/1" } } } }
+            """);
+        using var context = new SettingsTestContext(_paths);
+
+        var hardware = context.Services.GetRequiredService<IOptionsMonitor<AppSettings>>().CurrentValue.Features.Hardware;
+
+        hardware.EffectiveSensors.ShouldBe(["cpu_fan"]);
+        hardware.SensorOverrides["cpu_fan"].ShouldBe("/lpc/nct6798d/0/fan/1");
+    }
+
+    [Fact]
+    public void Bind_NoHardwareSection_IsOffWithDefaults()
+    {
+        _paths.WriteSettingsFile(SpecSample);
+        using var context = new SettingsTestContext(_paths);
+
+        var hardware = context.Services.GetRequiredService<IOptionsMonitor<AppSettings>>().CurrentValue.Features.Hardware;
+
+        hardware.Enabled.ShouldBeFalse("spec 5.8: off by default, so it never competes with HA's own integration");
+        hardware.Port.ShouldBe(8085);
+        hardware.EffectiveSensors.ShouldBe(["cpu_temperature", "cpu_fan", "ssd_temperature"]);
+    }
+
+    [Fact]
     public void Bind_SpecSample_ReadsEveryValue()
     {
         _paths.WriteSettingsFile(SpecSample);
