@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="Microsoft.Win32.SystemEvents" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
   </ItemGroup>
 
   <ItemGroup>

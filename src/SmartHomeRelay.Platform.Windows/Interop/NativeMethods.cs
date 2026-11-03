@@ -43,4 +43,13 @@ internal static partial class NativeMethods
     [LibraryImport("powrprof.dll")]
     [return: MarshalAs(UnmanagedType.U1)]
     public static partial bool IsPwrHibernateAllowed();
+
+    /// <summary>Cumulative idle, kernel (including idle), and user time, as FILETIME (100 ns units).</summary>
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetSystemTimes(out long idleTime, out long kernelTime, out long userTime);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
 }

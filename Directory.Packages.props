@@ -31,6 +31,8 @@
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
     <!-- Suspend/resume, session switch, and session ending events (spec 6). Not part of the base framework. -->
     <PackageVersion Include="Microsoft.Win32.SystemEvents" Version="10.0.10" />
+    <!-- GPU usage from the "GPU Engine" performance counters (spec 3.4, 5.5). Not part of the base framework. -->
+    <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup Label="Tests">

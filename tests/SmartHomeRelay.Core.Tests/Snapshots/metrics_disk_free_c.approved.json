@@ -1,0 +1,26 @@
+{
+  "name": "Disk C: free",
+  "unique_id": "desktop_abc123_disk_free_c",
+  "has_entity_name": true,
+  "availability_topic": "shr/DESKTOP-ABC123/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "state_topic": "shr/DESKTOP-ABC123/disk_free_c/state",
+  "device_class": "data_size",
+  "unit_of_measurement": "GiB",
+  "state_class": "measurement",
+  "icon": "mdi:harddisk",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

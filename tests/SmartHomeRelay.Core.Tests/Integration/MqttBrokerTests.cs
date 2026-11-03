@@ -58,15 +58,21 @@ public sealed class MqttBrokerTests : IAsyncLifetime
     [Fact]
     public async Task Connect_PublishesRetainedOnlineAndDiscovery()
     {
+        var discovery = _topics.Discovery(EntityComponent.Sensor, "uptime");
         var (supervisor, _, _) = await StartStackAsync();
         await Eventually.TrueAsync(() => supervisor.Status == RelayStatus.Connected, "connected to the broker");
 
-        // A late subscriber still gets them, which proves they are retained.
-        await using var observer = await ObserveDeviceAsync();
-        await Eventually.TrueAsync(() => observer.Saw(_topics.Availability, "online"), "retained online is received");
+        // First make sure discovery has been published. A subscriber that was already listening gets it
+        // live, and MQTT clears the retain flag on live deliveries, so it can't prove retention.
+        await using var first = await ObserveDeviceAsync();
+        await Eventually.TrueAsync(() => first.Messages.Any(m => m.Topic == discovery), "discovery is published");
+
+        // A subscriber that arrives afterwards can only receive what the broker retained.
+        await using var late = await ObserveDeviceAsync();
+        await Eventually.TrueAsync(() => late.Messages.Any(m => m.Topic == _topics.Availability && m.Payload == "online" && m.Retained), "online is retained");
         await Eventually.TrueAsync(
-            () => observer.Messages.Any(m => m.Topic == _topics.Discovery(EntityComponent.Sensor, "uptime") && m.Retained && m.Payload.Contains("\"manufacturer\":\"Smart Home Relay\"", StringComparison.Ordinal)),
-            "retained discovery config is received");
+            () => late.Messages.Any(m => m.Topic == discovery && m.Retained && m.Payload.Contains("\"manufacturer\":\"Smart Home Relay\"", StringComparison.Ordinal)),
+            "discovery is retained");
     }
 
     [Fact]

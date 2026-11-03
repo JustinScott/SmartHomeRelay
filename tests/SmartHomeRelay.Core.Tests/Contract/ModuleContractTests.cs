@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
@@ -24,6 +25,7 @@ public sealed class ModuleContractTests
         [
             new PresenceModule(new FakeSystemEventSource(), sources, sources, settings, TimeProvider.System),
             new PowerModule(power, power, settings, TimeProvider.System),
+            new MetricsModule(new FakeMetricsSource(), settings, TimeProvider.System),
         ];
     }
 

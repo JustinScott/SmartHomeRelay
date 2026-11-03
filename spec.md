@@ -333,11 +333,19 @@ Implementation details (milestone 5):
 |---|---|---|
 | `cpu_usage` | sensor (%) | |
 | `memory_usage` | sensor (%) | Plus `memory_used_gb` |
-| `disk_usage_{drive}` | sensor (%) | One per fixed drive; plus free space in GB |
+| `disk_usage_{drive}` | sensor (%) | One per fixed drive; plus free space in GiB as `disk_free_{drive}` (e.g. `disk_usage_c`, `disk_free_c`) |
 | `network_down` / `network_up` | sensor (Mbps) | Aggregate of the active adapter(s) |
 | `gpu_usage` | sensor (%) | From Windows GPU Engine performance counters. Not created if the counters are unavailable |
 
 - Update interval configurable (default 30s). Publish only when the value changes meaningfully (small deadband) to limit MQTT chatter.
+- Implementation details (milestone 6):
+  - **Deadband ("moderate"):** a value is published when CPU/GPU/memory/disk % moves at least 2 points, a size moves at least 0.1 GiB, or a network rate moves at least 10% (and at least 0.1 Mbit/s). The first value is always published. Percentages are whole numbers; sizes and rates have one decimal.
+  - **Sizes are GiB** (1024^3 bytes), matching Task Manager and Explorer, and are labeled `GiB` in HA because HA reads `GB` as 10^9 bytes. Keys keep their spec names (`memory_used_gb`).
+  - **CPU %** is busy time over total time between samples (`GetSystemTimes`). Windows 11's Task Manager shows "% Processor Utility", which is scaled by clock speed, so the two can differ somewhat.
+  - **GPU %** is computed like Task Manager: the "GPU Engine" utilization counter is summed per engine across processes, and the busiest engine of any GPU is reported.
+  - **Network** counts only physical Ethernet and Wi-Fi adapters that are up. Virtual (Hyper-V, VMware, VirtualBox, WSL), VPN/tunnel, Bluetooth, and loopback adapters are left out, because their traffic also crosses a physical adapter. A counter that goes backwards (adapter reset) is skipped for that sample.
+  - **Drive entities** are the fixed drives present at startup; GPU is offered only if its counters exist at startup. Changes take effect after an app restart.
+  - **Timing:** memory and disk are published at start, CPU/network/GPU 2 seconds later (they need two samples), then everything every `intervalSeconds` (re-read each time, so a change applies on the next sample). Sampling pauses during sleep and rate baselines restart on wake.
 - **No elevation (v1):** the app runs as a standard user and never requests administrator rights. Any metric that needs admin access (CPU/GPU temperatures, fan speeds, power draw through low-level hardware access) is **out of scope**. Only metrics available to a standard user are implemented.
 
 ### 5.6 Notifications

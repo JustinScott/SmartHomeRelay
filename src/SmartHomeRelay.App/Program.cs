@@ -8,12 +8,14 @@ using SmartHomeRelay.App.Tray;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Platform.Windows;
 using SmartHomeRelay.Platform.Windows.Configuration;
 using SmartHomeRelay.Platform.Windows.Hosting;
+using SmartHomeRelay.Platform.Windows.Metrics;
 using SmartHomeRelay.Platform.Windows.Power;
 using SmartHomeRelay.Platform.Windows.Presence;
 
@@ -66,6 +68,10 @@ internal static class Program
         builder.Services.AddSingleton<IPowerController, WindowsPowerController>();
         builder.Services.AddSingleton<IUptimeProvider, WindowsUptimeProvider>();
         builder.Services.AddSingleton<IFeatureModule, PowerModule>();
+
+        // Metrics (spec 5.5)
+        builder.Services.AddSingleton<ISystemMetricsSource, WindowsSystemMetricsSource>();
+        builder.Services.AddSingleton<IFeatureModule, MetricsModule>();
 
         using var host = builder.Build();
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SmartHomeRelay.App");
