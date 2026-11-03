@@ -7,10 +7,13 @@ using SmartHomeRelay.App.Logging;
 using SmartHomeRelay.App.Tray;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
+using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Platform.Windows;
 using SmartHomeRelay.Platform.Windows.Configuration;
 using SmartHomeRelay.Platform.Windows.Hosting;
+using SmartHomeRelay.Platform.Windows.Presence;
 
 namespace SmartHomeRelay.App;
 
@@ -51,7 +54,11 @@ internal static class Program
         builder.Services.AddRelayMqtt();
         builder.Services.AddSingleton<TrayApplicationContext>();
 
-        // Feature modules: one line each (spec 13), added from milestone 4 on.
+        // Feature modules (spec 13): the module plus its platform implementations.
+        // Presence (spec 5.1)
+        builder.Services.AddSingleton<IIdleTimeProvider, WindowsIdleTimeProvider>();
+        builder.Services.AddSingleton<ISessionStateProvider, WindowsSessionStateProvider>();
+        builder.Services.AddSingleton<IFeatureModule, PresenceModule>();
 
         using var host = builder.Build();
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SmartHomeRelay.App");

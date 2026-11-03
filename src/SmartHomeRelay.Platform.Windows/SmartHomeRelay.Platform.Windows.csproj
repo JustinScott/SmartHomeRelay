@@ -5,6 +5,8 @@
     <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <RootNamespace>SmartHomeRelay.Platform.Windows</RootNamespace>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <!-- LibraryImport source-generates the P/Invoke marshalling in Interop/ (spec 10), which needs pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

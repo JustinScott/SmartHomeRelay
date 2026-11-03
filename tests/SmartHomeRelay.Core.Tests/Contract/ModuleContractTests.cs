@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Core.Mqtt;
 using SmartHomeRelay.Core.Tests.TestSupport;
@@ -12,8 +13,16 @@ namespace SmartHomeRelay.Core.Tests.Contract;
 /// </summary>
 public sealed class ModuleContractTests
 {
-    /// <summary>Every shipped module. Empty until milestone 4 (Presence).</summary>
-    private static IReadOnlyList<IFeatureModule> AllModules() => [];
+    /// <summary>Every shipped module, constructed with fakes.</summary>
+    private static IReadOnlyList<IFeatureModule> AllModules()
+    {
+        var sources = new FakePresenceSources();
+        var settings = new FakeSettingsState(FakeSettingsState.Configured());
+        return
+        [
+            new PresenceModule(new FakeSystemEventSource(), sources, sources, settings, TimeProvider.System),
+        ];
+    }
 
     [Fact]
     public void AllModules_PassCatalogValidation()

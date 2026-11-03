@@ -267,6 +267,16 @@ Signals exposed: **session state** and **keyboard/mouse idle time** (per decisio
 - Publish on change only, with a periodic refresh for idle seconds.
 - Lock/unlock/logon/logoff/remote-connect events come from `SystemEvents.SessionSwitch`, **not** polling.
 
+Implementation details (milestone 4):
+
+- **Sampling:** idle time is read every 5 seconds (`GetLastInputInfo`). Each value is published only when it changes.
+- **`idle_seconds` is reported in steps:** 5-second steps under 5 minutes of idle, then 1-minute steps. It reads 0 while the user is active (so nothing is published), and long idle periods such as overnight produce at most one update a minute. Without steps, each PC would add about 17,000 history rows a day to HA. `user_active` and `presence_state` use the exact idle time, not the stepped value.
+- **Lock and unlock publish immediately** (no waiting for the next sample). `Logon` counts as unlocked; other session events don't change the lock state.
+- **Initial and post-wake lock state** is read from Windows (`WTSQuerySessionInformation`, `WTSSessionInfoEx`) for the app's session, because a lock can happen around sleep without an event reaching the app. If it can't be read, the app assumes unlocked; the next lock event corrects it.
+- **Sleep:** sampling pauses on suspend (`IPowerAware`) and restarts on wake.
+- **`session_locked` uses no HA device class.** HA's `lock` class means ON = *unlocked*, the opposite of this entity's name, so it uses an icon (`mdi:monitor-lock`) instead. `user_active` uses device class `occupancy`; `idle_seconds` uses `duration` (s) with state class `measurement`; `presence_state` is an `enum` sensor.
+- **`logged_in_user`** is the Windows user name of the session the app runs in (`none` if unavailable).
+
 ### 5.2 Power
 
 | Entity | Type | Notes |
@@ -603,6 +613,5 @@ Conventions:
 
 **Open**
 
-- [ ] **Manual test pending (milestone 3):** Home Assistant restart against the real broker. Publish `online` to `homeassistant/status` (or restart HA) and confirm the app immediately republishes `shr/{host}/status` = `online` and its discovery configs. Covered by automated tests (`ModuleHostTests.HomeAssistantOnline_RepublishesDiscoveryAndState`), not yet confirmed on the real broker. Easiest to check in milestone 4, when the first entities exist.
 - [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.
