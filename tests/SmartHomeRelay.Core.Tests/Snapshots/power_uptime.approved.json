@@ -7,7 +7,7 @@
   "payload_not_available": "offline",
   "state_topic": "shr/DESKTOP-ABC123/uptime/state",
   "device_class": "duration",
-  "unit_of_measurement": "s",
+  "unit_of_measurement": "h",
   "icon": "mdi:clock-outline",
   "entity_category": "diagnostic",
   "device": {

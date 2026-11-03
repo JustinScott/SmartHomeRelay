@@ -165,7 +165,7 @@ public sealed class PowerModuleTests : IAsyncDisposable
         await _module.StartAsync(_context, Ct);
 
         _context.Latest(PowerKeys.LastBoot).ShouldBe("2026-11-02T15:29:18+00:00");
-        _context.Latest(PowerKeys.Uptime).ShouldBe("10800"); // rounded down to the minute
+        _context.Latest(PowerKeys.Uptime).ShouldBe("3.0"); // hours, rounded down to a tenth
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public sealed class PowerModuleTests : IAsyncDisposable
 
         _power.Uptime += TimeSpan.FromMinutes(1);
         await Eventually.TrueAsync(() => _context.Count(PowerKeys.Uptime) == 2, "uptime is published at 5 minutes", () => _time.Advance(TimeSpan.FromMinutes(1)));
-        _context.Latest(PowerKeys.Uptime).ShouldBe(((long)TimeSpan.FromHours(3).Add(TimeSpan.FromMinutes(5)).TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _context.Latest(PowerKeys.Uptime).ShouldBe("3.0"); // 3 h 5 min is still under 3.1 h
     }
 
     [Fact]
@@ -199,15 +199,17 @@ public sealed class PowerModuleTests : IAsyncDisposable
 
         _power.Uptime = TimeSpan.FromHours(10);
         await _module.OnResumedAsync(Ct);
-        _context.Latest(PowerKeys.Uptime).ShouldBe("36000");
+        _context.Latest(PowerKeys.Uptime).ShouldBe("10.0");
     }
 
     [Theory]
-    [InlineData(0, "0")]
-    [InlineData(59, "0")]
-    [InlineData(61, "60")]
-    [InlineData(-5, "0")]
-    public void FormatUptime_RoundsDownToTheMinute(double seconds, string expected)
+    [InlineData(0, "0.0")]
+    [InlineData(359, "0.0")] // 5 min 59 s
+    [InlineData(360, "0.1")] // 6 min
+    [InlineData(49_000, "13.6")] // 13 h 36 min 40 s
+    [InlineData(1_000_000, "277.7")] // over 11 days: still hours, never "1E+..." or a thousands separator
+    [InlineData(-5, "0.0")]
+    public void FormatUptime_IsHoursRoundedDownToATenth(double seconds, string expected)
     {
         PowerModule.FormatUptime(TimeSpan.FromSeconds(seconds)).ShouldBe(expected);
     }

@@ -94,11 +94,14 @@ public sealed partial class PowerModule : IFeatureModule, IPowerAware, IDisposab
         _publishing?.Dispose();
     }
 
-    /// <summary>Seconds since boot, rounded down to the minute (finer precision is noise at a 5-minute interval).</summary>
+    /// <summary>
+    /// Hours since boot, rounded down to one decimal (6 minutes), e.g. <c>13.6</c>. Hours read naturally in
+    /// HA; finer precision is noise at a 5-minute publish interval.
+    /// </summary>
     internal static string FormatUptime(TimeSpan uptime)
     {
-        var seconds = Math.Max(0, (long)uptime.TotalSeconds);
-        return (seconds - (seconds % 60)).ToString(CultureInfo.InvariantCulture);
+        var tenths = Math.Max(0, (long)(uptime.Ticks / (TimeSpan.TicksPerHour / 10)));
+        return (tenths / 10.0).ToString("0.0", CultureInfo.InvariantCulture);
     }
 
     /// <summary>ISO 8601 in UTC, to the second, which HA parses for timestamp sensors.</summary>
@@ -130,7 +133,7 @@ public sealed partial class PowerModule : IFeatureModule, IPowerAware, IDisposab
         entities.Add(new EntityDescriptor(PowerKeys.Uptime, "Uptime", EntityComponent.Sensor)
         {
             DeviceClass = "duration",
-            UnitOfMeasurement = "s",
+            UnitOfMeasurement = "h",
             Icon = "mdi:clock-outline",
             Category = EntityCategory.Diagnostic,
         });

@@ -303,7 +303,7 @@ Implementation details (milestone 5):
 - **Only a `PRESS` payload** triggers a button; anything else is ignored.
 - **Shutdown, restart, sign-out, and cancel** run Windows' `shutdown.exe` with fixed arguments (`/s` or `/r` with `/t <delay>` and a comment, `/l`, `/a`). It shows the standard countdown notice and needs no elevation. Nothing from the MQTT payload reaches the command line.
 - **Sleep and hibernate** call `SetSuspendState`; **lock** calls `LockWorkStation`.
-- **`last_boot`** is a UTC timestamp published once at start. **`uptime`** is seconds since boot (including sleep), rounded down to the minute and published every 5 minutes (and right after wake). Both are diagnostic entities.
+- **`last_boot`** is a UTC timestamp published once at start. **`uptime`** is hours since boot (including sleep), unit `h`, rounded down to one decimal (e.g. `13.6`), published every 5 minutes (and right after wake). Hours rather than seconds so it reads naturally in HA without changing the display unit. Both are diagnostic entities.
 - Known caveat: `SetSuspendState` can hibernate instead of sleep on some configurations. Document and test the behavior on the target machine. **Verified on BOX1 (milestone 5): Sleep sleeps (not hibernates).**
 
 ### 5.3 Display
@@ -628,6 +628,8 @@ Conventions:
 - MQTT broker integration tests run in a Linux CI job.
 - Verified on the real broker and HA (milestone 4): sleep/wake, lock/unlock, and a Home Assistant restart (the app republishes status, discovery, and state).
 - Verified on BOX1 (milestone 5): Lock, Sleep (true sleep), Shutdown with the 60s Windows countdown, Cancel shutdown, and the allowShutdown setting taking effect without a restart.
+- Verified on BOX1 (milestone 6): CPU, memory, disk, and GPU match Task Manager. Network is an average over the sample interval, so it is smoother than Task Manager's 1-second view; accepted as is.
+- `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
 - Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).
 
