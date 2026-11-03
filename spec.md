@@ -603,5 +603,6 @@ Conventions:
 
 **Open**
 
+- [ ] **Manual test pending (milestone 3):** Home Assistant restart against the real broker. Publish `online` to `homeassistant/status` (or restart HA) and confirm the app immediately republishes `shr/{host}/status` = `online` and its discovery configs. Covered by automated tests (`ModuleHostTests.HomeAssistantOnline_RepublishesDiscoveryAndState`), not yet confirmed on the real broker. Easiest to check in milestone 4, when the first entities exist.
 - [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.
