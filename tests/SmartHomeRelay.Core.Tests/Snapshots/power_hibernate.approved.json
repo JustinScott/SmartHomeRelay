@@ -1,0 +1,25 @@
+{
+  "name": "Hibernate",
+  "unique_id": "desktop_abc123_hibernate",
+  "has_entity_name": true,
+  "availability_topic": "shr/DESKTOP-ABC123/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "command_topic": "shr/DESKTOP-ABC123/hibernate/set",
+  "qos": 1,
+  "payload_press": "PRESS",
+  "icon": "mdi:snowflake",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

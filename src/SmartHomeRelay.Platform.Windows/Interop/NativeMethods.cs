@@ -27,4 +27,20 @@ internal static partial class NativeMethods
 
     [LibraryImport("wtsapi32.dll")]
     public static partial void WTSFreeMemory(nint memory);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool LockWorkStation();
+
+    /// <summary>Sleeps (<paramref name="hibernate"/> false) or hibernates. Blocks until the system resumes.</summary>
+    [LibraryImport("powrprof.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static partial bool SetSuspendState(
+        [MarshalAs(UnmanagedType.U1)] bool hibernate,
+        [MarshalAs(UnmanagedType.U1)] bool force,
+        [MarshalAs(UnmanagedType.U1)] bool wakeupEventsDisabled);
+
+    [LibraryImport("powrprof.dll")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static partial bool IsPwrHibernateAllowed();
 }

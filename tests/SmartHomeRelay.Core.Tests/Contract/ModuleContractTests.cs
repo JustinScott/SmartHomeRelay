@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SmartHomeRelay.Core.Features;
+using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Core.Mqtt;
@@ -17,10 +18,12 @@ public sealed class ModuleContractTests
     private static IReadOnlyList<IFeatureModule> AllModules()
     {
         var sources = new FakePresenceSources();
+        var power = new FakePowerController();
         var settings = new FakeSettingsState(FakeSettingsState.Configured());
         return
         [
             new PresenceModule(new FakeSystemEventSource(), sources, sources, settings, TimeProvider.System),
+            new PowerModule(power, power, settings, TimeProvider.System),
         ];
     }
 

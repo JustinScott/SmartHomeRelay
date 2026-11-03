@@ -283,6 +283,7 @@ Implementation details (milestone 4):
 |---|---|---|
 | `shutdown` | button | Delayed by `shutdownDelaySeconds` (default 60s); Windows shows its standard shutdown countdown |
 | `restart` | button | Same delay as `shutdown` |
+| `cancel_shutdown` | button | Aborts a pending (delayed) shutdown or restart. Always available with Power enabled (added in milestone 5) |
 | `sleep` | button | |
 | `hibernate` | button | Only offered if hibernation is enabled on the machine |
 | `lock` | button | `LockWorkStation` |
@@ -294,6 +295,15 @@ Implementation details (milestone 4):
 - Shutdown, restart, hibernate, and sign-out are **disabled by default** and must be enabled in settings.
 - Sleep and lock are not destructive: they are available whenever the Power feature is enabled and have no separate toggle.
 - `shutdownDelaySeconds` (0 to 600, default 60) applies to both shutdown and restart. 0 means immediate.
+
+Implementation details (milestone 5):
+
+- **Disallowed buttons are shown, not hidden.** All buttons always appear in HA; a press of shutdown, restart, hibernate, or sign-out that isn't allowed is ignored and logged with the setting to change. The allow flag is read at press time, so turning it off takes effect immediately. Invalid settings never allow a destructive action.
+- **Hibernate** is offered only if hibernation is enabled when the app starts (`IsPwrHibernateAllowed`). Enabling or disabling hibernation in Windows takes effect after an app restart.
+- **Only a `PRESS` payload** triggers a button; anything else is ignored.
+- **Shutdown, restart, sign-out, and cancel** run Windows' `shutdown.exe` with fixed arguments (`/s` or `/r` with `/t <delay>` and a comment, `/l`, `/a`). It shows the standard countdown notice and needs no elevation. Nothing from the MQTT payload reaches the command line.
+- **Sleep and hibernate** call `SetSuspendState`; **lock** calls `LockWorkStation`.
+- **`last_boot`** is a UTC timestamp published once at start. **`uptime`** is seconds since boot (including sleep), rounded down to the minute and published every 5 minutes (and right after wake). Both are diagnostic entities.
 - Known caveat: `SetSuspendState` can hibernate instead of sleep on some configurations. Document and test the behavior on the target machine.
 
 ### 5.3 Display
