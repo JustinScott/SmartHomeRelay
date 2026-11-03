@@ -32,7 +32,7 @@ Single primary user (the author), but built cleanly enough to run on any Windows
 - Arbitrary command or script execution from HA.
 - A polished or themed UI. The UI is a tray icon and one settings window.
 - Wake-from-sleep or wake-from-off. This is handled on the HA side (e.g., Wake-on-LAN integration).
-- Anything that requires administrator privileges (the app never elevates).
+- Anything that requires administrator privileges (the app never elevates). Hardware sensors that need a driver come from a LibreHardwareMonitor install the user manages (5.8); the app itself stays a standard-user process.
 - MQTT over TLS (deferred; see section 12).
 - Auto-update.
 
@@ -351,7 +351,7 @@ Implementation details (milestone 5):
   - **GPU temperature and power level** come from `D3DKMTQueryAdapterInfo(KMTQAITYPE_ADAPTERPERFDATA)` per adapter (tenths of °C and tenths of a percent). One card can appear under several adapter IDs and software adapters report nothing, so the highest reported value is used. Temperature is published as whole °C when it moves at least 2 °C; power level uses the percent deadband.
   - **Drive entities** are the fixed drives present at startup; GPU usage, CPU power, GPU temperature, and GPU power level are offered only if Windows reports them at startup. Changes take effect after an app restart.
   - **Timing:** memory and disk are published at start, CPU/CPU power/network/GPU 2 seconds later (they need two samples), then everything every `intervalSeconds` (re-read each time, so a change applies on the next sample). Sampling pauses during sleep and rate baselines restart on wake.
-- **No elevation (v1):** the app runs as a standard user and never requests administrator rights. Any metric that needs admin access or a kernel driver is **out of scope**: notably **CPU temperature** (Windows only exposes ACPI thermal zones, which are fake on many desktops, e.g. 16.9 °C on BOX1), fan speeds, and motherboard sensors. For those, run LibreHardwareMonitor alongside and use HA's Libre Hardware Monitor integration. Only metrics available to a standard user are implemented; `tools/probe-sensors.ps1` shows what a given PC exposes.
+- **No elevation (v1):** the app runs as a standard user and never requests administrator rights. The app never reads anything that needs admin access or a kernel driver itself: notably **CPU temperature** (Windows only exposes ACPI thermal zones, which are fake on many desktops, e.g. 16.9 °C on BOX1), fan speeds, and motherboard sensors. Those come from a user-managed LibreHardwareMonitor through the Hardware feature (5.8). Only metrics available to a standard user are implemented; `tools/probe-sensors.ps1` shows what a given PC exposes.
 
 ### 5.6 Notifications
 
@@ -403,6 +403,29 @@ Behavior rules:
 ### 5.7 Candidate features for later (not v1)
 
 Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state, editing `discoveryPrefix` and `baseTopic` in the settings window (an Advanced section with a warning that changing them breaks existing automations).
+
+### 5.8 Hardware sensors (LibreHardwareMonitor) — planned, milestone not assigned
+
+Reads a **LibreHardwareMonitor (LHM) that the user installs and runs** (elevated, with its PawnIO driver) through LHM's local web server, and publishes selected sensors on the app's own HA device. The app never elevates, ships no driver, and adds no NuGet packages for this (HTTP and JSON come from the BCL). Setup steps for users: `docs/hardware-sensors.md`.
+
+- **Off by default** (`features.hardware.enabled`). Use either this feature **or** HA's Libre Hardware Monitor integration, never both (every sensor would appear twice). Turning it off clears its discovery like any feature toggle.
+- **Source:** only `GET http://127.0.0.1:{port}/data.json`. The host is fixed to loopback and is not a setting. The app never calls LHM's other endpoints (notably `/Sensor?action=Set`, which changes hardware controls).
+- **Entities:** a curated, stable key list, chosen in `features.hardware.sensors`. Keys are matched by rule (hardware type, sensor type, sensor name), never exposed as LHM's internal sensor IDs. Initial list, to be confirmed against BOX1's `data.json`:
+
+| Key | Unit | Source in LHM |
+|---|---|---|
+| `cpu_temperature` | °C | CPU package temperature (AMD Tctl/Tdie, Intel CPU Package) |
+| `cpu_fan` | RPM | The motherboard fan the user maps as the CPU fan |
+| `ssd_temperature` | °C | System drive temperature |
+| `hardware_status` | — | Diagnostic: `ok`, `not_running`, `login_failed`, `untrusted`, `newer_than_tested`, `incompatible`; attributes give the detected LHM version and the newest tested version |
+
+- **Availability:** hardware entities use two availability topics with `availability_mode: all` (the device's `status`, and `{baseTopic}/{deviceId}/hardware/status`), so they go *unavailable* when LHM is unusable while the rest of the device stays online. `hardware_status` itself uses only the device topic.
+- **Compatibility:** `data.json` has no version field, so the version is read from the running `LibreHardwareMonitor.exe` (file version, readable by a standard user). A table in code: below 0.9.5 → `incompatible` (no stable sensor IDs; HA's integration has the same cutoff); tested range (0.9.5–0.9.6 to start) → supported; newer → tried with `newer_than_tested`. One saved `data.json` per supported version is a test fixture; supporting a new release = add its sample and move the tested version in the same commit.
+- **Validation on every read:** HTTP 200, JSON, ≤ 4 MB, ≤ 3 s; tree shape (`Text`, `Children`; sensors with `SensorId`, `Type`, numeric `RawValue`); each mapped sensor found by its rule (a missing one goes unavailable alone); values within physical limits (−40 to 150 °C, 0 to 20,000 RPM, 0 to 100 %). A failed structural check sets `incompatible` and makes all hardware entities unavailable. Wrong values are never published.
+- **User notice:** one tray balloon per new problem (not per read), e.g. "LibreHardwareMonitor 0.9.8 changed its data format. Hardware sensors are paused. Version 0.9.6 is known to work." The tray status shows the same text; details go to the log.
+- **Anti-spoofing** (a local program pretending to be LHM): before reading, the app finds the process listening on the port (no admin needed). If it is the System process, the listener is HTTP.sys, which needs admin rights or an admin-made URL reservation to register, so it is trusted (to be verified on BOX1 before relying on it). If it is an ordinary process, its image must be `LibreHardwareMonitor.exe` in an admin-only-writable folder. A running `LibreHardwareMonitor.exe` in such a folder, at a supported version, is required either way. If credentials are configured and the server does not ask for them, the source is `untrusted`. Anything failing these checks is `untrusted` and not read.
+- **Credentials:** LHM's web server login (`username`, `password`), with the password DPAPI-encrypted like the MQTT password (section 7). Basic auth over loopback only.
+- **Later (not planned):** a provider interface so other read-only sources (NVIDIA NVML, AMD ADLX) plug in with one class and one registration line, compiled in, never loaded from a folder; and an optional SYSTEM sensor service hosting the LHM library, which would need pinned dependencies, a lock file, and signature, vulnerability and license checks first. Hardware control (fans, power limits) stays out of scope.
 
 ---
 
@@ -466,7 +489,8 @@ Notes:
     "display":  { "enabled": true },
     "audio":    { "enabled": true },
     "metrics":  { "enabled": true, "intervalSeconds": 30 },
-    "notifications": { "enabled": true, "imageDownloadTimeoutSeconds": 10, "imageMaxBytes": 10485760 }
+    "notifications": { "enabled": true, "imageDownloadTimeoutSeconds": 10, "imageMaxBytes": 10485760 },
+    "hardware": { "enabled": false, "port": 8085, "username": "", "passwordProtected": "", "sensors": ["cpu_temperature", "cpu_fan", "ssd_temperature"] }
   },
   "startWithWindows": true,
   "logLevel": "Information"
@@ -476,6 +500,7 @@ Notes:
 - `device.id` and `device.name` default to the host name when empty. On first run the file is written with the current host name, which pins the ID so a later host name change does not create new HA entities.
 - An empty `mqtt.host` means "not configured": the app runs and the tray shows *Not configured*.
 - A settings file that is not valid JSON, has a value of the wrong type, or fails validation never crashes the app. The problems are logged, the tray shows *Settings error*, and the app runs on defaults (for parse or type errors) until the file is fixed. The user's file is never overwritten in that case.
+- `features.hardware` (5.8) is off by default. Its `password` is entered and encrypted the same way as the MQTT password. It has no host setting: LHM is always read on `127.0.0.1`.
 - `logLevel` accepts `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical`, and is applied live (section 11).
 
 ### 7.1 Settings window (WinForms)
@@ -561,7 +586,7 @@ Conventions:
 
 - v1 connects to the broker over **plain TCP with username/password authentication** (no TLS, matching the author's LAN setup). TLS support is deferred. The settings model keeps a `useTls` field (always `false` in v1) so TLS can be added later without breaking existing config files.
 - Credentials protected with DPAPI. No secrets in logs, in discovery payloads, or in the repo. A password typed into `settings.json` by hand is encrypted and removed from the file as soon as the app reads it (section 7).
-- The app only talks to the configured broker (plus HTTP(S) image downloads for notifications, with size and time limits).
+- The app only talks to the configured broker (plus HTTP(S) image downloads for notifications, with size and time limits, and, when the Hardware feature is on, `GET /data.json` from LibreHardwareMonitor on `127.0.0.1` with the checks in 5.8).
 - **No credentials, IP addresses, or host names in source code** (the prototype hardcoded them). They live only in settings, with the password DPAPI-encrypted. Rotate any credential that was ever committed to source control.
 - Repository hygiene: enable GitHub secret scanning and push protection. `settings.json` lives in `%APPDATA%`, outside the repo, so it cannot be committed by accident.
 - Notification image paths and activation URLs are validated as described in 5.6 (`http`/`https` URLs only; no local file access).
@@ -635,11 +660,13 @@ Conventions:
 - Verified on BOX1 (milestone 5): Lock, Sleep (true sleep), Shutdown with the 60s Windows countdown, Cancel shutdown, and the allowShutdown setting taking effect without a restart.
 - Verified on BOX1 (milestone 6): CPU, memory, disk, and GPU match Task Manager. Network is an average over the sample interval, so it is smoother than Task Manager's 1-second view; accepted as is.
 - Added after milestone 6, verified with `tools/probe-sensors.ps1` on BOX1 (Ryzen 7 5800X3D, AMD GPU) as a standard user: `cpu_power` (Energy Meter), `gpu_temperature` and `gpu_power_level` (D3DKMT adapter perf data). CPU temperature is not available without a driver.
+- Hardware sensors (CPU temperature, fans) come from a LibreHardwareMonitor the user installs and manages, read through its local web server (5.8). Chosen over a bundled elevated sensor service: no elevation, driver, or new packages in the app, and all sensors stay on one HA device. Use this feature or HA's LHM integration, not both.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
 - Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).
 
 **Open**
 
+- [ ] Hardware sensors via LibreHardwareMonitor (5.8): assign a milestone (it does not need the installer); confirm the key list from BOX1's `data.json` (LHM 0.9.6 with PawnIO), saved as the first test fixture; verify on BOX1 that LHM's port is owned by the System process (HTTP.sys).
 - [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.
