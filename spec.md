@@ -608,6 +608,7 @@ Conventions:
 - Until milestone 9, settings are edited in `settings.json` directly: it opens on first run, and a plain `password` field is encrypted automatically.
 - The settings window stays in milestone 9. Editable topic settings are a later enhancement (5.7).
 - MQTT broker integration tests run in a Linux CI job.
+- Verified on the real broker and HA (milestone 4): sleep/wake, lock/unlock, and a Home Assistant restart (the app republishes status, discovery, and state).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
 - Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).
 
