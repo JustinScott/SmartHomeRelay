@@ -14,6 +14,9 @@ internal static partial class NativeMethods
     /// <summary><c>WTS_SESSIONSTATE_UNLOCK</c>.</summary>
     public const int WtsSessionStateUnlock = 1;
 
+    /// <summary><c>KMTQAITYPE_ADAPTERPERFDATA</c>: fills a <see cref="D3dkmtAdapterPerfData"/>.</summary>
+    public const int KmtqaitypeAdapterPerfData = 62;
+
     /// <summary>The local server, for the WTS functions.</summary>
     public static readonly nint WtsCurrentServerHandle = 0;
 
@@ -52,4 +55,16 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
+
+    /// <summary>Enumerates GPU adapters, opening a handle to each. Returns an NTSTATUS (0 = success).</summary>
+    [LibraryImport("gdi32.dll")]
+    public static partial int D3DKMTEnumAdapters2(ref D3dkmtEnumAdapters2 enumAdapters);
+
+    /// <summary>Queries adapter information. Returns an NTSTATUS (0 = success).</summary>
+    [LibraryImport("gdi32.dll")]
+    public static partial int D3DKMTQueryAdapterInfo(ref D3dkmtQueryAdapterInfo query);
+
+    /// <summary>Closes an adapter handle from D3DKMTEnumAdapters2. Returns an NTSTATUS (0 = success).</summary>
+    [LibraryImport("gdi32.dll")]
+    public static partial int D3DKMTCloseAdapter(ref D3dkmtCloseAdapter close);
 }

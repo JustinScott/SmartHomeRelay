@@ -336,6 +336,9 @@ Implementation details (milestone 5):
 | `disk_usage_{drive}` | sensor (%) | One per fixed drive; plus free space in GiB as `disk_free_{drive}` (e.g. `disk_usage_c`, `disk_free_c`) |
 | `network_down` / `network_up` | sensor (Mbps) | Aggregate of the active adapter(s) |
 | `gpu_usage` | sensor (%) | From Windows GPU Engine performance counters. Not created if the counters are unavailable |
+| `cpu_power` | sensor (W) | CPU package power from the Windows "Energy Meter" counters (the CPU's RAPL energy counters). Not created if no package instance exists |
+| `gpu_temperature` | sensor (°C) | Hottest GPU, from the Windows adapter perf data Task Manager uses. Not created if no GPU reports it |
+| `gpu_power_level` | sensor (%) | GPU power draw as a percentage of the card's maximum (Windows doesn't report watts vendor-neutrally). Highest GPU. Not created if no GPU reports it |
 
 - Update interval configurable (default 30s). Publish only when the value changes meaningfully (small deadband) to limit MQTT chatter.
 - Implementation details (milestone 6):
@@ -344,9 +347,11 @@ Implementation details (milestone 5):
   - **CPU %** is busy time over total time between samples (`GetSystemTimes`). Windows 11's Task Manager shows "% Processor Utility", which is scaled by clock speed, so the two can differ somewhat.
   - **GPU %** is computed like Task Manager: the "GPU Engine" utilization counter is summed per engine across processes, and the busiest engine of any GPU is reported.
   - **Network** counts only physical Ethernet and Wi-Fi adapters that are up. Virtual (Hyper-V, VMware, VirtualBox, WSL), VPN/tunnel, Bluetooth, and loopback adapters are left out, because their traffic also crosses a physical adapter. A counter that goes backwards (adapter reset) is skipped for that sample.
-  - **Drive entities** are the fixed drives present at startup; GPU is offered only if its counters exist at startup. Changes take effect after an app restart.
-  - **Timing:** memory and disk are published at start, CPU/network/GPU 2 seconds later (they need two samples), then everything every `intervalSeconds` (re-read each time, so a change applies on the next sample). Sampling pauses during sleep and rate baselines restart on wake.
-- **No elevation (v1):** the app runs as a standard user and never requests administrator rights. Any metric that needs admin access (CPU/GPU temperatures, fan speeds, power draw through low-level hardware access) is **out of scope**. Only metrics available to a standard user are implemented.
+  - **CPU power** sums the `rapl_package*_pkg` Energy Meter instances (milliwatts → W). Per-core, DRAM, and `_total` instances are ignored. Published as whole watts when it moves at least 10% (and at least 2 W).
+  - **GPU temperature and power level** come from `D3DKMTQueryAdapterInfo(KMTQAITYPE_ADAPTERPERFDATA)` per adapter (tenths of °C and tenths of a percent). One card can appear under several adapter IDs and software adapters report nothing, so the highest reported value is used. Temperature is published as whole °C when it moves at least 2 °C; power level uses the percent deadband.
+  - **Drive entities** are the fixed drives present at startup; GPU usage, CPU power, GPU temperature, and GPU power level are offered only if Windows reports them at startup. Changes take effect after an app restart.
+  - **Timing:** memory and disk are published at start, CPU/CPU power/network/GPU 2 seconds later (they need two samples), then everything every `intervalSeconds` (re-read each time, so a change applies on the next sample). Sampling pauses during sleep and rate baselines restart on wake.
+- **No elevation (v1):** the app runs as a standard user and never requests administrator rights. Any metric that needs admin access or a kernel driver is **out of scope**: notably **CPU temperature** (Windows only exposes ACPI thermal zones, which are fake on many desktops, e.g. 16.9 °C on BOX1), fan speeds, and motherboard sensors. For those, run LibreHardwareMonitor alongside and use HA's Libre Hardware Monitor integration. Only metrics available to a standard user are implemented; `tools/probe-sensors.ps1` shows what a given PC exposes.
 
 ### 5.6 Notifications
 
@@ -629,6 +634,7 @@ Conventions:
 - Verified on the real broker and HA (milestone 4): sleep/wake, lock/unlock, and a Home Assistant restart (the app republishes status, discovery, and state).
 - Verified on BOX1 (milestone 5): Lock, Sleep (true sleep), Shutdown with the 60s Windows countdown, Cancel shutdown, and the allowShutdown setting taking effect without a restart.
 - Verified on BOX1 (milestone 6): CPU, memory, disk, and GPU match Task Manager. Network is an average over the sample interval, so it is smoother than Task Manager's 1-second view; accepted as is.
+- Added after milestone 6, verified with `tools/probe-sensors.ps1` on BOX1 (Ryzen 7 5800X3D, AMD GPU) as a standard user: `cpu_power` (Energy Meter), `gpu_temperature` and `gpu_power_level` (D3DKMT adapter perf data). CPU temperature is not available without a driver.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
 - Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).

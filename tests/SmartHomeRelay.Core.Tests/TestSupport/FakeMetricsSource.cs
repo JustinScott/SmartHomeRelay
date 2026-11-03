@@ -21,6 +21,22 @@ internal sealed class FakeMetricsSource : ISystemMetricsSource
 
     public Exception? ThrowOnGpu { get; set; }
 
+    /// <summary>Like BOX1 (Ryzen): per-core and package RAPL instances plus a <c>_total</c> that reads 0.</summary>
+    public List<string> EnergyMeterInstances { get; set; } = ["rapl_package0_core0_core", "rapl_package0_core1_core", "rapl_package0_pkg", "_total"];
+
+    public Dictionary<string, double> EnergyMeterMilliwatts { get; set; } = new()
+    {
+        ["rapl_package0_core0_core"] = 930,
+        ["rapl_package0_core1_core"] = 3350,
+        ["rapl_package0_pkg"] = 56_050,
+        ["_total"] = 0,
+    };
+
+    /// <summary>Like BOX1: one AMD card that Windows lists under two adapter IDs.</summary>
+    public List<GpuAdapterSensors> GpuSensors { get; set; } = [new(0x4160BFB, 47.0, 3.2, 1095), new(0x22414, 47.0, 3.2, 1095)];
+
+    public Exception? ThrowOnGpuSensors { get; set; }
+
     public int GpuReads { get; private set; }
 
     /// <summary>Simulates CPU activity: <paramref name="busyPercent"/> busy over <paramref name="elapsed"/> on one core.</summary>
@@ -55,5 +71,19 @@ internal sealed class FakeMetricsSource : ISystemMetricsSource
         }
 
         return new Dictionary<string, double>(GpuEngines);
+    }
+
+    public IReadOnlyList<string> GetEnergyMeterInstances() => [.. EnergyMeterInstances];
+
+    public IReadOnlyDictionary<string, double> GetEnergyMeterPowerMilliwatts() => new Dictionary<string, double>(EnergyMeterMilliwatts);
+
+    public IReadOnlyList<GpuAdapterSensors> GetGpuAdapterSensors()
+    {
+        if (ThrowOnGpuSensors is { } ex)
+        {
+            throw ex;
+        }
+
+        return [.. GpuSensors];
     }
 }

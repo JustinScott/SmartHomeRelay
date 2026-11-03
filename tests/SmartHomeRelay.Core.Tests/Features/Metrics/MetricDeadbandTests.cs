@@ -9,6 +9,8 @@ public sealed class MetricDeadbandTests
     [InlineData(MetricKind.Percent)]
     [InlineData(MetricKind.Gigabytes)]
     [InlineData(MetricKind.Rate)]
+    [InlineData(MetricKind.Watts)]
+    [InlineData(MetricKind.Temperature)]
     public void ShouldPublish_FirstValue_AlwaysPublishes(MetricKind kind)
     {
         MetricDeadband.ShouldPublish(kind, null, 0).ShouldBeTrue();
@@ -47,6 +49,29 @@ public sealed class MetricDeadbandTests
     }
 
     [Theory]
+    [InlineData(10, 11.9, false)] // under the 2 W floor
+    [InlineData(10, 12, true)]
+    [InlineData(56, 61, false)] // under 10% (5.6 W)
+    [InlineData(56, 62, true)]
+    [InlineData(56, 40, true)]
+    public void ShouldPublish_Watts_TenPercentWithTwoWattFloor(double last, double current, bool expected)
+    {
+        MetricDeadband.ShouldPublish(MetricKind.Watts, last, current).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(47, 48.5, false)]
+    [InlineData(47, 49, true)]
+    [InlineData(47, 45, true)]
+    public void ShouldPublish_Temperature_TwoDegrees(double last, double current, bool expected)
+    {
+        MetricDeadband.ShouldPublish(MetricKind.Temperature, last, current).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(MetricKind.Watts, 56.05, "56")]
+    [InlineData(MetricKind.Watts, -3, "0")]
+    [InlineData(MetricKind.Temperature, 47.5, "48")]
     [InlineData(MetricKind.Percent, 42.4, "42")]
     [InlineData(MetricKind.Percent, 42.5, "43")]
     [InlineData(MetricKind.Percent, 104, "100")]

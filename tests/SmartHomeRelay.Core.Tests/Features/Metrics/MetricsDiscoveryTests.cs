@@ -16,6 +16,9 @@ public sealed class MetricsDiscoveryTests
     [InlineData("network_down")]
     [InlineData("network_up")]
     [InlineData("gpu_usage")]
+    [InlineData("cpu_power")]
+    [InlineData("gpu_temperature")]
+    [InlineData("gpu_power_level")]
     public void Discovery_MatchesApprovedSnapshot(string key)
     {
         var settings = FakeSettingsState.Configured();

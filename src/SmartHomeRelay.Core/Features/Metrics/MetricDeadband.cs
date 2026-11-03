@@ -20,6 +20,15 @@ public static class MetricDeadband
     /// <summary>Smallest absolute rate change, in Mbit/s, that is published.</summary>
     public const double RateMinimum = 0.1;
 
+    /// <summary>Smallest relative power change that is published.</summary>
+    public const double WattsFraction = 0.10;
+
+    /// <summary>Smallest absolute power change, in watts, that is published.</summary>
+    public const double WattsMinimum = 2;
+
+    /// <summary>Smallest temperature change, in degrees, that is published.</summary>
+    public const double Degrees = 2;
+
     /// <summary>True if <paramref name="current"/> differs enough from the last published value.</summary>
     public static bool ShouldPublish(MetricKind kind, double? lastPublished, double current)
     {
@@ -34,14 +43,18 @@ public static class MetricDeadband
             MetricKind.Percent => change >= PercentPoints,
             MetricKind.Gigabytes => change >= Gigabytes - 1e-9,
             MetricKind.Rate => change >= Math.Max(RateMinimum, last * RateFraction) - 1e-9,
+            MetricKind.Watts => change >= Math.Max(WattsMinimum, last * WattsFraction) - 1e-9,
+            MetricKind.Temperature => change >= Degrees,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown metric kind."),
         };
     }
 
-    /// <summary>The MQTT payload: whole percent, or one decimal for GB and rates.</summary>
+    /// <summary>The MQTT payload: whole percent, watts, and degrees; one decimal for GB and rates.</summary>
     public static string Format(MetricKind kind, double value) => kind switch
     {
         MetricKind.Percent => Math.Round(Math.Clamp(value, 0, 100), MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture),
+        MetricKind.Watts => Math.Round(Math.Max(0, value), MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture),
+        MetricKind.Temperature => Math.Round(value, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture),
         MetricKind.Gigabytes or MetricKind.Rate => Math.Round(Math.Max(0, value), 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown metric kind."),
     };

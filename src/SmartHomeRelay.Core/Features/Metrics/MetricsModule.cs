@@ -6,11 +6,12 @@ using SmartHomeRelay.Core.Entities;
 namespace SmartHomeRelay.Core.Features.Metrics;
 
 /// <summary>
-/// System metrics (spec 5.5): CPU, memory, per-drive disk, network rates, and GPU.
+/// System metrics (spec 5.5): CPU, memory, per-drive disk, network rates, GPU, CPU power, and GPU sensors.
 /// <list type="bullet">
 /// <item>Sampled every <c>features.metrics.intervalSeconds</c> (default 30), read fresh each time.</item>
 /// <item>Published only on a meaningful change (<see cref="MetricDeadband"/>).</item>
-/// <item>Drive entities are the fixed drives present at startup; GPU only if its counters exist.</item>
+/// <item>Drive entities are the fixed drives present at startup; GPU, CPU power, and GPU sensors only if
+/// Windows reports them at startup.</item>
 /// <item>Sampling pauses during sleep; rate baselines are reset on wake.</item>
 /// </list>
 /// </summary>
@@ -24,6 +25,9 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
     private readonly TimeProvider _time;
     private readonly IReadOnlyList<char> _driveLetters;
     private readonly bool _gpu;
+    private readonly bool _cpuPower;
+    private readonly bool _gpuTemperature;
+    private readonly bool _gpuPower;
     private readonly IReadOnlyList<EntityDescriptor> _entities;
     private readonly Dictionary<string, double> _published = new(StringComparer.Ordinal);
     private IModuleContext? _context;
@@ -43,6 +47,10 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
         // Decided once so DescribeEntities returns the same keys every time (module contract).
         _driveLetters = TryOrDefault(() => source.GetFixedDrives().Select(d => char.ToUpperInvariant(d.Letter)).Distinct().ToList(), []);
         _gpu = TryOrDefault(() => source.IsGpuAvailable, false);
+        _cpuPower = TryOrDefault(() => source.GetEnergyMeterInstances().Any(MetricsCalculator.IsCpuPackageInstance), false);
+        var gpuSensors = TryOrDefault(() => source.GetGpuAdapterSensors(), []);
+        _gpuTemperature = MetricsCalculator.GpuTemperatureCelsius(gpuSensors) is not null;
+        _gpuPower = gpuSensors.Any(a => a.PowerPercent > 0);
         _entities = BuildEntities();
     }
 
@@ -103,9 +111,24 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
         var entities = new List<EntityDescriptor>
         {
             Percent(MetricsKeys.CpuUsage, "CPU usage", "mdi:cpu-64-bit"),
+        };
+
+        if (_cpuPower)
+        {
+            entities.Add(new EntityDescriptor(MetricsKeys.CpuPower, "CPU power", EntityComponent.Sensor)
+            {
+                DeviceClass = "power",
+                UnitOfMeasurement = "W",
+                StateClass = "measurement",
+                Icon = "mdi:flash",
+            });
+        }
+
+        entities.AddRange(
+        [
             Percent(MetricsKeys.MemoryUsage, "Memory usage", "mdi:memory"),
             Gigabytes(MetricsKeys.MemoryUsedGb, "Memory used", "mdi:memory"),
-        };
+        ]);
 
         foreach (var letter in _driveLetters)
         {
@@ -119,6 +142,23 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
         if (_gpu)
         {
             entities.Add(Percent(MetricsKeys.GpuUsage, "GPU usage", "mdi:expansion-card"));
+        }
+
+        if (_gpuTemperature)
+        {
+            entities.Add(new EntityDescriptor(MetricsKeys.GpuTemperature, "GPU temperature", EntityComponent.Sensor)
+            {
+                DeviceClass = "temperature",
+                UnitOfMeasurement = "°C",
+                StateClass = "measurement",
+                Icon = "mdi:thermometer",
+            });
+        }
+
+        if (_gpuPower)
+        {
+            // A percentage of the card's maximum, not watts: that is all Windows reports vendor-neutrally.
+            entities.Add(Percent(MetricsKeys.GpuPowerLevel, "GPU power level", "mdi:flash"));
         }
 
         return entities;
@@ -155,6 +195,11 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
         if (_gpu)
         {
             TryOrDefault(() => _source.GetGpuEngineUtilization(), null); // primes the counters
+        }
+
+        if (_cpuPower)
+        {
+            TryOrDefault(() => _source.GetEnergyMeterPowerMilliwatts(), null); // primes the counters
         }
     }
 
@@ -214,6 +259,10 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
         if (includeRates)
         {
             await MeasureAsync("CPU", MetricsKeys.CpuUsage, MetricKind.Percent, ReadCpu, cancellationToken).ConfigureAwait(false);
+            if (_cpuPower)
+            {
+                await MeasureAsync("CPU power", MetricsKeys.CpuPower, MetricKind.Watts, () => MetricsCalculator.CpuPackagePowerWatts(_source.GetEnergyMeterPowerMilliwatts()), cancellationToken).ConfigureAwait(false);
+            }
         }
 
         MemoryStatus? memory = TryOrDefault<MemoryStatus?>(() => _source.GetMemory(), null);
@@ -240,6 +289,16 @@ public sealed partial class MetricsModule : IFeatureModule, IPowerAware, IDispos
             if (_gpu)
             {
                 await MeasureAsync("GPU", MetricsKeys.GpuUsage, MetricKind.Percent, () => MetricsCalculator.GpuUsagePercent(_source.GetGpuEngineUtilization()), cancellationToken).ConfigureAwait(false);
+            }
+
+            if (_gpuTemperature)
+            {
+                await MeasureAsync("GPU temperature", MetricsKeys.GpuTemperature, MetricKind.Temperature, () => MetricsCalculator.GpuTemperatureCelsius(_source.GetGpuAdapterSensors()), cancellationToken).ConfigureAwait(false);
+            }
+
+            if (_gpuPower)
+            {
+                await MeasureAsync("GPU power", MetricsKeys.GpuPowerLevel, MetricKind.Percent, () => MetricsCalculator.GpuPowerPercent(_source.GetGpuAdapterSensors()), cancellationToken).ConfigureAwait(false);
             }
         }
     }

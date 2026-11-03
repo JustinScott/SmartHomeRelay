@@ -2,7 +2,7 @@ using SmartHomeRelay.Core.Abstractions;
 
 namespace SmartHomeRelay.Core.Features.Metrics;
 
-/// <summary>Pure metric math (spec 5.5): CPU %, memory, network rates, GPU aggregation, disk.</summary>
+/// <summary>Pure metric math (spec 5.5): CPU %, memory, network rates, GPU aggregation, disk, power, temperature.</summary>
 public static class MetricsCalculator
 {
     /// <summary>Bytes per gigabyte (GiB, as Windows Task Manager and Explorer show "GB").</summary>
@@ -114,6 +114,56 @@ public static class MetricsCalculator
 
         return Math.Clamp(perEngine.Values.Max(), 0, 100);
     }
+
+    /// <summary>
+    /// True for the Energy Meter instance that measures a whole CPU package (<c>rapl_package0_pkg</c>), as
+    /// opposed to single cores (<c>rapl_package0_core3_core</c>), DRAM, or the <c>_total</c> instance.
+    /// </summary>
+    public static bool IsCpuPackageInstance(string instanceName)
+    {
+        ArgumentNullException.ThrowIfNull(instanceName);
+        return instanceName.StartsWith("rapl_package", StringComparison.OrdinalIgnoreCase)
+            && instanceName.EndsWith("_pkg", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>CPU package power in watts (summed over packages). Null if no package instance reported.</summary>
+    public static double? CpuPackagePowerWatts(IReadOnlyDictionary<string, double> energyMeterMilliwatts)
+    {
+        ArgumentNullException.ThrowIfNull(energyMeterMilliwatts);
+        double? total = null;
+        foreach (var (instance, milliwatts) in energyMeterMilliwatts)
+        {
+            if (IsCpuPackageInstance(instance) && !double.IsNaN(milliwatts))
+            {
+                total = (total ?? 0) + (Math.Max(0, milliwatts) / 1000);
+            }
+        }
+
+        return total;
+    }
+
+    /// <summary>The hottest GPU in °C. Null if no adapter reports a temperature.</summary>
+    public static double? GpuTemperatureCelsius(IReadOnlyList<GpuAdapterSensors> adapters)
+    {
+        ArgumentNullException.ThrowIfNull(adapters);
+        var reporting = adapters.Where(a => a.TemperatureCelsius > 0).ToList();
+        return reporting.Count == 0 ? null : reporting.Max(a => a.TemperatureCelsius);
+    }
+
+    /// <summary>
+    /// The highest GPU power level (% of the card's maximum). Null if no adapter reports one. Adapters that
+    /// report no sensors at all (e.g. the Microsoft Basic Render Driver) are ignored.
+    /// </summary>
+    public static double? GpuPowerPercent(IReadOnlyList<GpuAdapterSensors> adapters)
+    {
+        ArgumentNullException.ThrowIfNull(adapters);
+        var reporting = adapters.Where(ReportsSensors).ToList();
+        return reporting.Count == 0 ? null : Math.Clamp(reporting.Max(a => a.PowerPercent), 0, 100);
+    }
+
+    /// <summary>True if the adapter reports any sensor at all (software adapters report none).</summary>
+    internal static bool ReportsSensors(GpuAdapterSensors adapter) =>
+        adapter.TemperatureCelsius > 0 || adapter.PowerPercent > 0 || adapter.FanRpm > 0;
 
     /// <summary>The engine part of an instance name: everything from <c>luid_</c> on (drops the process ID).</summary>
     internal static string EngineKey(string instanceName)

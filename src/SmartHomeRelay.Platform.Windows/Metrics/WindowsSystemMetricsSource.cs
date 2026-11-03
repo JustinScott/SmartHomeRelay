@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using SmartHomeRelay.Core.Abstractions;
@@ -8,33 +7,16 @@ using SmartHomeRelay.Platform.Windows.Interop;
 namespace SmartHomeRelay.Platform.Windows.Metrics;
 
 /// <summary>
-/// Raw counters for the Metrics module (spec 5.5), all readable by a standard user. Thin OS wrapper:
-/// percentages and rates are computed in Core.
+/// Raw counters for the Metrics module (spec 5.5), all readable by a standard user (no driver, no
+/// elevation). Thin OS wrapper: percentages, rates, and which instance counts are decided in Core.
 /// </summary>
 public sealed class WindowsSystemMetricsSource : ISystemMetricsSource
 {
-    private const string GpuCategory = "GPU Engine";
-    private const string GpuCounter = "Utilization Percentage";
-
-    private readonly Lock _gpuGate = new();
-    private Dictionary<string, CounterSample> _lastGpuSamples = new(StringComparer.Ordinal);
+    private readonly PerformanceCounterDeltaReader _gpuEngines = new("GPU Engine", "Utilization Percentage");
+    private readonly PerformanceCounterDeltaReader _energyMeter = new("Energy Meter", "Power");
 
     /// <inheritdoc />
-    public bool IsGpuAvailable
-    {
-        get
-        {
-            try
-            {
-                return PerformanceCounterCategory.Exists(GpuCategory)
-                    && PerformanceCounterCategory.CounterExists(GpuCounter, GpuCategory);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or UnauthorizedAccessException)
-            {
-                return false;
-            }
-        }
-    }
+    public bool IsGpuAvailable => _gpuEngines.Exists;
 
     /// <inheritdoc />
     public CpuTimes GetCpuTimes()
@@ -94,39 +76,85 @@ public sealed class WindowsSystemMetricsSource : ISystemMetricsSource
     }
 
     /// <inheritdoc />
-    public IReadOnlyDictionary<string, double> GetGpuEngineUtilization()
+    public IReadOnlyDictionary<string, double> GetGpuEngineUtilization() => _gpuEngines.Read();
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> GetEnergyMeterInstances() => _energyMeter.GetInstanceNames();
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<string, double> GetEnergyMeterPowerMilliwatts() => _energyMeter.Read();
+
+    /// <inheritdoc />
+    public IReadOnlyList<GpuAdapterSensors> GetGpuAdapterSensors()
     {
-        lock (_gpuGate)
+        // First call gets the count, second fills the buffer (and opens a handle per adapter).
+        var enumAdapters = default(D3dkmtEnumAdapters2);
+        if (NativeMethods.D3DKMTEnumAdapters2(ref enumAdapters) != 0 || enumAdapters.NumAdapters == 0)
         {
-            InstanceDataCollection? instances;
-            try
+            return [];
+        }
+
+        var size = Marshal.SizeOf<D3dkmtAdapterInfo>();
+        var buffer = Marshal.AllocHGlobal(size * (int)enumAdapters.NumAdapters);
+        try
+        {
+            enumAdapters.Adapters = buffer;
+
+            // Fails (and opens nothing) if an adapter appeared in between; this sample is then skipped.
+            if (NativeMethods.D3DKMTEnumAdapters2(ref enumAdapters) != 0)
             {
-                // One read of the whole category per sample: far cheaper than a counter per engine instance,
-                // and instances come and go with processes.
-                instances = new PerformanceCounterCategory(GpuCategory).ReadCategory()[GpuCounter];
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or UnauthorizedAccessException)
-            {
-                return new Dictionary<string, double>();
+                return [];
             }
 
-            var current = new Dictionary<string, CounterSample>(StringComparer.Ordinal);
-            var utilization = new Dictionary<string, double>(StringComparer.Ordinal);
-            if (instances is not null)
+            var sensors = new List<GpuAdapterSensors>();
+            for (var i = 0; i < enumAdapters.NumAdapters; i++)
             {
-                foreach (InstanceData instance in instances.Values)
+                var info = Marshal.PtrToStructure<D3dkmtAdapterInfo>(buffer + (i * size));
+                try
                 {
-                    current[instance.InstanceName] = instance.Sample;
-                    if (_lastGpuSamples.TryGetValue(instance.InstanceName, out var previous))
+                    if (TryQueryPerfData(info.Adapter, out var perf))
                     {
-                        // Utilization is a time-based counter: it needs two samples to give a percentage.
-                        utilization[instance.InstanceName] = CounterSample.Calculate(previous, instance.Sample);
+                        sensors.Add(ToSensors(info, perf));
                     }
+                }
+                finally
+                {
+                    var close = new D3dkmtCloseAdapter { Adapter = info.Adapter };
+                    _ = NativeMethods.D3DKMTCloseAdapter(ref close);
                 }
             }
 
-            _lastGpuSamples = current;
-            return utilization;
+            return sensors;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    /// <summary>Converts the driver's tenths of a degree and tenths of a percent.</summary>
+    internal static GpuAdapterSensors ToSensors(D3dkmtAdapterInfo info, D3dkmtAdapterPerfData perf) =>
+        new(
+            ((long)info.LuidHighPart << 32) | info.LuidLowPart,
+            perf.Temperature / 10.0,
+            perf.Power / 10.0,
+            perf.FanRpm);
+
+    private static unsafe bool TryQueryPerfData(uint adapter, out D3dkmtAdapterPerfData perf)
+    {
+        perf = default;
+        fixed (D3dkmtAdapterPerfData* data = &perf)
+        {
+            var query = new D3dkmtQueryAdapterInfo
+            {
+                Adapter = adapter,
+                Type = NativeMethods.KmtqaitypeAdapterPerfData,
+                PrivateDriverData = (nint)data,
+                PrivateDriverDataSize = (uint)sizeof(D3dkmtAdapterPerfData),
+            };
+
+            // Software adapters (Microsoft Basic Render Driver) return STATUS_INVALID_PARAMETER: no sensors.
+            return NativeMethods.D3DKMTQueryAdapterInfo(ref query) == 0;
         }
     }
 

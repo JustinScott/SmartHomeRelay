@@ -6,6 +6,9 @@ public static class MetricsKeys
     /// <summary>sensor (%): CPU usage.</summary>
     public const string CpuUsage = "cpu_usage";
 
+    /// <summary>sensor (W): CPU package power. Only if the Energy Meter counters exist.</summary>
+    public const string CpuPower = "cpu_power";
+
     /// <summary>sensor (%): physical memory in use.</summary>
     public const string MemoryUsage = "memory_usage";
 
@@ -20,6 +23,12 @@ public static class MetricsKeys
 
     /// <summary>sensor (%): GPU usage (busiest engine). Only if GPU counters exist.</summary>
     public const string GpuUsage = "gpu_usage";
+
+    /// <summary>sensor (°C): GPU temperature (hottest GPU). Only if Windows reports it.</summary>
+    public const string GpuTemperature = "gpu_temperature";
+
+    /// <summary>sensor (%): GPU power draw as a percentage of its maximum (highest GPU). Only if Windows reports it.</summary>
+    public const string GpuPowerLevel = "gpu_power_level";
 
     /// <summary>sensor (%): used space on a drive, e.g. <c>disk_usage_c</c>.</summary>
     public static string DiskUsage(char letter) => $"disk_usage_{char.ToLowerInvariant(letter)}";

@@ -27,4 +27,19 @@ public interface ISystemMetricsSource
     /// unavailable.
     /// </summary>
     IReadOnlyDictionary<string, double> GetGpuEngineUtilization();
+
+    /// <summary>
+    /// Instance names of the Windows "Energy Meter" performance counters (e.g. <c>rapl_package0_pkg</c>),
+    /// which expose the CPU's own energy counters. Empty if the PC doesn't have them.
+    /// </summary>
+    IReadOnlyList<string> GetEnergyMeterInstances();
+
+    /// <summary>
+    /// Power in milliwatts per "Energy Meter" instance since the previous call. Empty on the first call or
+    /// if unavailable.
+    /// </summary>
+    IReadOnlyDictionary<string, double> GetEnergyMeterPowerMilliwatts();
+
+    /// <summary>Per-adapter GPU sensors from Windows (temperature, power level, fan). Empty if unavailable.</summary>
+    IReadOnlyList<GpuAdapterSensors> GetGpuAdapterSensors();
 }

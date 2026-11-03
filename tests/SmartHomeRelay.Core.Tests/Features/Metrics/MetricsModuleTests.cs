@@ -27,14 +27,55 @@ public sealed class MetricsModuleTests : IAsyncDisposable
     }
 
     [Fact]
-    public void DescribeEntities_OneUsageAndFreeEntityPerFixedDrive_PlusGpu()
+    public void DescribeEntities_OneUsageAndFreeEntityPerFixedDrive_PlusGpuAndPower()
     {
         _module.DescribeEntities().Select(e => e.Key).ShouldBe(
         [
-            "cpu_usage", "memory_usage", "memory_used_gb",
+            "cpu_usage", "cpu_power", "memory_usage", "memory_used_gb",
             "disk_usage_c", "disk_free_c", "disk_usage_d", "disk_free_d",
-            "network_down", "network_up", "gpu_usage",
+            "network_down", "network_up", "gpu_usage", "gpu_temperature", "gpu_power_level",
         ]);
+    }
+
+    [Fact]
+    public void DescribeEntities_NoEnergyMeterPackage_NoCpuPower()
+    {
+        // Per-core instances alone (or none at all) don't give package power.
+        _source.EnergyMeterInstances = ["rapl_package0_core0_core", "_total"];
+        _module = new MetricsModule(_source, _settings, _time);
+
+        _module.DescribeEntities().Select(e => e.Key).ShouldNotContain("cpu_power");
+    }
+
+    [Fact]
+    public void DescribeEntities_NoGpuSensors_NoGpuTemperatureOrPower()
+    {
+        _source.GpuSensors = [];
+        _module = new MetricsModule(_source, _settings, _time);
+
+        var keys = _module.DescribeEntities().Select(e => e.Key).ToList();
+        keys.ShouldNotContain("gpu_temperature");
+        keys.ShouldNotContain("gpu_power_level");
+    }
+
+    [Fact]
+    public void DescribeEntities_GpuReportsTemperatureOnly_NoPowerLevel()
+    {
+        _source.GpuSensors = [new(1, 55, 0, 0)];
+        _module = new MetricsModule(_source, _settings, _time);
+
+        var keys = _module.DescribeEntities().Select(e => e.Key).ToList();
+        keys.ShouldContain("gpu_temperature");
+        keys.ShouldNotContain("gpu_power_level");
+    }
+
+    [Fact]
+    public void DescribeEntities_SensorReadThrowsAtStartup_EntitiesLeftOut()
+    {
+        _source.ThrowOnGpuSensors = new InvalidOperationException("driver broken");
+        _module = new MetricsModule(_source, _settings, _time);
+
+        _module.DescribeEntities().Select(e => e.Key).ShouldNotContain("gpu_temperature");
     }
 
     [Fact]
@@ -76,6 +117,43 @@ public sealed class MetricsModuleTests : IAsyncDisposable
         _context.Latest(MetricsKeys.NetworkDown).ShouldBe("10.0");
         _context.Latest(MetricsKeys.NetworkUp).ShouldBe("1.0");
         _context.Latest(MetricsKeys.GpuUsage).ShouldBe("10");
+        _context.Latest(MetricsKeys.CpuPower).ShouldBe("56");
+        _context.Latest(MetricsKeys.GpuTemperature).ShouldBe("47");
+        _context.Latest(MetricsKeys.GpuPowerLevel).ShouldBe("3");
+    }
+
+    [Fact]
+    public async Task Sample_PowerAndTemperature_UseTheirOwnDeadbands()
+    {
+        await StartAndWarmUpAsync(cpuPercent: 25);
+
+        // +1 °C and +1 W: below the deadband. The GPU power level change (+5 points) is published.
+        _source.GpuSensors = [new(1, 48, 8.2, 1100)];
+        _source.EnergyMeterMilliwatts["rapl_package0_pkg"] = 57_000;
+        _source.RunCpu(Interval, 25);
+        await AdvanceUntilAsync(() => _context.Latest(MetricsKeys.GpuPowerLevel) == "8", Interval);
+        _context.Count(MetricsKeys.GpuTemperature).ShouldBe(1);
+        _context.Count(MetricsKeys.CpuPower).ShouldBe(1);
+
+        // Now well past both deadbands.
+        _source.GpuSensors = [new(1, 65, 60, 1800)];
+        _source.EnergyMeterMilliwatts["rapl_package0_pkg"] = 98_400;
+        _source.RunCpu(Interval, 90);
+        await AdvanceUntilAsync(() => _context.Latest(MetricsKeys.GpuTemperature) == "65", Interval);
+        _context.Latest(MetricsKeys.CpuPower).ShouldBe("98");
+    }
+
+    [Fact]
+    public async Task Sample_GpuSensorReadFails_OtherMetricsStillPublished()
+    {
+        await _module.StartAsync(_context, Ct);
+        _source.ThrowOnGpuSensors = new InvalidOperationException("driver reset");
+
+        _source.RunCpu(MetricsModule.WarmUp, 40);
+        await AdvanceUntilAsync(() => _context.Latest(MetricsKeys.CpuUsage) == "40", MetricsModule.WarmUp);
+
+        _context.Latest(MetricsKeys.GpuTemperature).ShouldBeNull();
+        _context.Latest(MetricsKeys.CpuPower).ShouldBe("56");
     }
 
     [Fact]

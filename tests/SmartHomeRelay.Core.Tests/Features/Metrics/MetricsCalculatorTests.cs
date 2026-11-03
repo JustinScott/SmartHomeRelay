@@ -136,6 +136,68 @@ public sealed class MetricsCalculatorTests
         MetricsCalculator.GpuUsagePercent(new Dictionary<string, double>()).ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("rapl_package0_pkg", true)]
+    [InlineData("RAPL_Package0_PKG", true)] // Intel systems use upper case
+    [InlineData("rapl_package1_pkg", true)]
+    [InlineData("rapl_package0_core3_core", false)]
+    [InlineData("rapl_package0_dram", false)]
+    [InlineData("_total", false)]
+    public void IsCpuPackageInstance_OnlyWholePackages(string instance, bool expected)
+    {
+        MetricsCalculator.IsCpuPackageInstance(instance).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void CpuPackagePower_IsPackageMilliwattsInWatts_IgnoringCoresAndTotal()
+    {
+        var meters = new Dictionary<string, double>
+        {
+            ["rapl_package0_core0_core"] = 930,
+            ["rapl_package0_pkg"] = 56_050,
+            ["_total"] = 0,
+        };
+
+        MetricsCalculator.CpuPackagePowerWatts(meters)!.Value.ShouldBe(56.05, tolerance: 0.0001);
+    }
+
+    [Fact]
+    public void CpuPackagePower_TwoSockets_AreSummed()
+    {
+        var meters = new Dictionary<string, double> { ["rapl_package0_pkg"] = 40_000, ["rapl_package1_pkg"] = 35_000 };
+
+        MetricsCalculator.CpuPackagePowerWatts(meters).ShouldBe(75);
+    }
+
+    [Fact]
+    public void CpuPackagePower_NoPackageInstance_IsNull()
+    {
+        MetricsCalculator.CpuPackagePowerWatts(new Dictionary<string, double>()).ShouldBeNull();
+        MetricsCalculator.CpuPackagePowerWatts(new Dictionary<string, double> { ["rapl_package0_core0_core"] = 900 }).ShouldBeNull();
+    }
+
+    [Fact]
+    public void GpuTemperature_IsTheHottestReportingAdapter()
+    {
+        GpuAdapterSensors[] adapters = [new(1, 47, 3.2, 1095), new(2, 0, 0, 0), new(3, 61.5, 20, 1500)];
+
+        MetricsCalculator.GpuTemperatureCelsius(adapters).ShouldBe(61.5);
+    }
+
+    [Fact]
+    public void GpuTemperature_NoneReported_IsNull()
+    {
+        MetricsCalculator.GpuTemperatureCelsius([new GpuAdapterSensors(1, 0, 0, 0)]).ShouldBeNull();
+    }
+
+    [Fact]
+    public void GpuPower_IsTheHighestLevel_AndZeroIsAValidReading()
+    {
+        MetricsCalculator.GpuPowerPercent([new GpuAdapterSensors(1, 47, 3.2, 1095), new GpuAdapterSensors(2, 50, 12.5, 0)]).ShouldBe(12.5);
+        MetricsCalculator.GpuPowerPercent([new GpuAdapterSensors(1, 47, 0, 1095)]).ShouldBe(0, "a GPU that reports other sensors at 0% power is idle, not missing");
+        MetricsCalculator.GpuPowerPercent([new GpuAdapterSensors(1, 0, 0, 0)]).ShouldBeNull("software adapters report nothing");
+    }
+
     private static NetworkAdapterCounters Adapter(string id, long received, long sent, string description = "Intel(R) Ethernet") =>
         new(id, description, NetworkAdapterKind.Ethernet, true, received, sent);
 }
