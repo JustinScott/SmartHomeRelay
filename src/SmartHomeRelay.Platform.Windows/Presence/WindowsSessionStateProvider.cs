@@ -29,12 +29,13 @@ public sealed class WindowsSessionStateProvider : ISessionStateProvider
 
         try
         {
-            if (bytes < NativeMethods.WtsInfoExSessionFlagsOffset + sizeof(int))
+            if (bytes < Marshal.SizeOf<WtsInfoEx>())
             {
                 return false;
             }
 
-            return Marshal.ReadInt32(buffer, NativeMethods.WtsInfoExSessionFlagsOffset) == NativeMethods.WtsSessionStateLock;
+            var info = Marshal.PtrToStructure<WtsInfoEx>(buffer);
+            return info.Level == 1 && IsLockedFlag(info.Data.SessionFlags);
         }
         finally
         {
@@ -44,4 +45,10 @@ public sealed class WindowsSessionStateProvider : ISessionStateProvider
 
     /// <inheritdoc />
     public string GetUserName() => Environment.UserName;
+
+    /// <summary>
+    /// Interprets <c>SessionFlags</c>. Only an explicit lock counts as locked; unknown (-1) is treated as
+    /// unlocked, and a lock event corrects it.
+    /// </summary>
+    internal static bool IsLockedFlag(int sessionFlags) => sessionFlags == NativeMethods.WtsSessionStateLock;
 }

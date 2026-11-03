@@ -38,6 +38,14 @@ public sealed class WindowsPresenceProviderTests
     }
 
     [Fact]
+    public void IsLocked_WhileTestsRun_IsNotLocked()
+    {
+        // Regression: an active, unlocked session was reported as locked. Tests run in an unlocked
+        // session (locally) or a service session that is not locked (CI), so this must be false.
+        new WindowsSessionStateProvider().IsLocked().ShouldBeFalse();
+    }
+
+    [Fact]
     public void GetUserName_ReturnsCurrentUser()
     {
         new WindowsSessionStateProvider().GetUserName().ShouldBe(Environment.UserName);

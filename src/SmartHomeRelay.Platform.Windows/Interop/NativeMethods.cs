@@ -14,12 +14,6 @@ internal static partial class NativeMethods
     /// <summary><c>WTS_SESSIONSTATE_UNLOCK</c>.</summary>
     public const int WtsSessionStateUnlock = 1;
 
-    /// <summary>
-    /// Offset of <c>SessionFlags</c> in <c>WTSINFOEXW</c>: <c>DWORD Level</c>, then <c>WTSINFOEX_LEVEL1_W</c>
-    /// starting with <c>ULONG SessionId</c>, <c>WTS_CONNECTSTATE_CLASS SessionState</c>, <c>LONG SessionFlags</c>.
-    /// </summary>
-    public const int WtsInfoExSessionFlagsOffset = 12;
-
     /// <summary>The local server, for the WTS functions.</summary>
     public static readonly nint WtsCurrentServerHandle = 0;
 
