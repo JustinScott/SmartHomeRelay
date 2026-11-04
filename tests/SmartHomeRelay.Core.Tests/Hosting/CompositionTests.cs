@@ -45,6 +45,7 @@ public sealed class CompositionTests : IDisposable
         [
             typeof(SettingsState),
             typeof(SettingsFileInitializer),
+            typeof(SettingsFileCompleter),
             typeof(PlainPasswordEncryptor),
             typeof(ModuleHost),
             typeof(MqttConnectionSupervisor),

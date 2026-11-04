@@ -30,6 +30,7 @@ public static class SettingsServiceCollectionExtensions
         // Order matters: the state is evaluated before the initializer decides whether to write defaults.
         services.AddHostedService(sp => sp.GetRequiredService<SettingsState>());
         services.AddHostedService<SettingsFileInitializer>();
+        services.AddHostedService<SettingsFileCompleter>();
         services.AddHostedService<PlainPasswordEncryptor>();
 
         return services;

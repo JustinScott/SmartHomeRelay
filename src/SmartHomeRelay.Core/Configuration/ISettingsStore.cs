@@ -13,6 +13,13 @@ public interface ISettingsStore
     Task SaveAsync(AppSettings settings, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Adds every setting that <paramref name="current"/> has but the file lacks (e.g. a section added in a
+    /// newer version), with the value the app is using now. Never changes or removes what is there, keeps the
+    /// file's order and unknown keys, and leaves a file with comments untouched (rewriting would drop them).
+    /// </summary>
+    Task<SettingsCompletion> AddMissingAsync(AppSettings current, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Returns a readable description of why the file cannot be parsed as JSON,
     /// or null if it is missing or parses correctly.
     /// </summary>

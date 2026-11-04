@@ -26,15 +26,19 @@ public sealed class SettingsFileInitializerTests : IDisposable
     }
 
     [Fact]
-    public async Task StartHostedServices_ExistingFile_LeavesItUnchanged()
+    public async Task StartHostedServices_ExistingFile_KeepsItsValues_AndIsNotReplacedWithDefaults()
     {
-        const string original = """{ "mqtt": { "host": "broker.local" } }""";
+        // The initializer never overwrites an existing file. (The completer may add missing settings; spec 7.)
+        const string original = """{ "mqtt": { "host": "broker.local", "port": 1884 } }""";
         _paths.WriteSettingsFile(original);
         using var context = new SettingsTestContext(_paths);
 
         await StartAllAsync(context);
 
-        (await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken)).ShouldBe(original);
+        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken));
+        document.RootElement.GetProperty("mqtt").GetProperty("host").GetString().ShouldBe("broker.local");
+        document.RootElement.GetProperty("mqtt").GetProperty("port").GetInt32().ShouldBe(1884);
+        context.Shell.OpenedFiles.ShouldBeEmpty("the welcome flow is for first run only");
     }
 
     [Fact]
@@ -75,16 +79,17 @@ public sealed class SettingsFileInitializerTests : IDisposable
     }
 
     [Fact]
-    public void AddRelaySettings_RegistersStateBeforeInitializerAndEncryptor()
+    public void AddRelaySettings_RegistersStateBeforeInitializerCompleterAndEncryptor()
     {
         using var context = new SettingsTestContext(_paths);
 
         var hosted = context.Services.GetServices<IHostedService>().ToList();
 
-        hosted.Count.ShouldBe(3);
+        hosted.Count.ShouldBe(4);
         hosted[0].ShouldBeOfType<SettingsState>();
         hosted[1].ShouldBeOfType<SettingsFileInitializer>();
-        hosted[2].ShouldBeOfType<PlainPasswordEncryptor>();
+        hosted[2].ShouldBeOfType<SettingsFileCompleter>();
+        hosted[3].ShouldBeOfType<PlainPasswordEncryptor>();
     }
 
     private static async Task StartAllAsync(SettingsTestContext context)

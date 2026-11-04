@@ -521,6 +521,7 @@ Notes:
 - `device.id` and `device.name` default to the host name when empty. On first run the file is written with the current host name, which pins the ID so a later host name change does not create new HA entities.
 - An empty `mqtt.host` means "not configured": the app runs and the tray shows *Not configured*.
 - A settings file that is not valid JSON, has a value of the wrong type, or fails validation never crashes the app. The problems are logged, the tray shows *Settings error*, and the app runs on defaults (for parse or type errors) until the file is fixed. The user's file is never overwritten in that case.
+- **New settings after an upgrade:** at startup, settings that this version has but an existing `settings.json` lacks (e.g. `features.hardware`) are added to the file with their current values (the defaults), so users can see and edit them. Only missing keys are added: existing values, key order, and unknown keys are kept, and keys match case-insensitively like configuration binding. A missing key goes after the key that precedes it in the default layout. The file is only rewritten when it parses and validates; a file with comments is never rewritten (it would lose them), and the missing settings are listed in the log instead. A section the user deletes comes back with its defaults on the next start.
 - `features.hardware` (5.8) is off by default. Its `password` is entered and encrypted the same way as the MQTT password. It has no host setting: LHM is always read on `127.0.0.1`.
 - `logLevel` accepts `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical`, and is applied live (section 11).
 
@@ -683,6 +684,7 @@ Conventions:
 - Added after milestone 6, verified with `tools/probe-sensors.ps1` on BOX1 (Ryzen 7 5800X3D, AMD GPU) as a standard user: `cpu_power` (Energy Meter), `gpu_temperature` and `gpu_power_level` (D3DKMT adapter perf data). CPU temperature is not available without a driver.
 - Hardware sensors (CPU temperature, fans) come from a LibreHardwareMonitor the user installs and manages, read through its local web server (5.8). Chosen over a bundled elevated sensor service: no elevation, driver, or new packages in the app, and all sensors stay on one HA device. Use this feature or HA's LHM integration, not both. Moved into milestone 6 so all metrics are settled before milestone 7.
 - Verified on BOX1 (hardware sensors, LHM 0.9.6 with PawnIO): `hardware_status` is `ok`, so the anti-spoofing checks pass against the real LHM; CPU and SSD temperatures map by rule. BOX1's Gigabyte board (ITE IT8688E) names its fans "Fan #1".."Fan #5", so `cpu_fan` needs a `sensorOverrides` entry, as designed (the rules never guess). Its real `data.json` is a test fixture.
+- An existing `settings.json` gains settings added in newer versions automatically at startup (section 7), instead of users pasting them in.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
 - Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).

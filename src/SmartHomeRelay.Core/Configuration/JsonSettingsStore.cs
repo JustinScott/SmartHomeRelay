@@ -22,8 +22,114 @@ public sealed class JsonSettingsStore(IAppPaths paths) : ISettingsStore
             Directory.CreateDirectory(directory);
         }
 
-        var document = WithPasswordPlaceholder(JsonSerializer.SerializeToNode(settings, SettingsJson.Options)!.AsObject());
+        await WriteAsync(path, ToDocument(settings), cancellationToken).ConfigureAwait(false);
+    }
 
+    /// <inheritdoc />
+    public async Task<SettingsCompletion> AddMissingAsync(AppSettings current, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+
+        var path = paths.SettingsFilePath;
+        var text = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+        if (JsonNode.Parse(text, documentOptions: SettingsJson.DocumentOptions) is not JsonObject file)
+        {
+            return new([], false, false);
+        }
+
+        var added = new List<string>();
+        var completed = Complete(file, ToDocument(current), prefix: string.Empty, added);
+        if (added.Count == 0)
+        {
+            return new([], false, false);
+        }
+
+        if (HasComments(text))
+        {
+            return new(added, false, true);
+        }
+
+        await WriteAsync(path, completed, cancellationToken).ConfigureAwait(false);
+        return new(added, true, false);
+    }
+
+    /// <summary>
+    /// <paramref name="file"/> with every key of <paramref name="defaults"/> it lacks, recursively. Keys match
+    /// case-insensitively (as configuration binding does). The file's keys keep their order and values; a
+    /// missing key goes right after the key that precedes it in <paramref name="defaults"/>.
+    /// </summary>
+    internal static JsonObject Complete(JsonObject file, JsonObject defaults, string prefix, List<string> added)
+    {
+        var defaultKeys = defaults.Select(p => p.Key).ToList();
+        string? FileKeyFor(string defaultKey) =>
+            file.Select(p => p.Key).FirstOrDefault(k => string.Equals(k, defaultKey, StringComparison.OrdinalIgnoreCase));
+
+        // Each missing key goes after the nearest earlier default key the file has (or first, if none).
+        var insertAfter = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var atStart = new List<string>();
+        string? anchor = null;
+        foreach (var key in defaultKeys)
+        {
+            if (FileKeyFor(key) is { } fileKey)
+            {
+                anchor = fileKey;
+            }
+            else if (anchor is null)
+            {
+                atStart.Add(key);
+            }
+            else
+            {
+                (insertAfter.TryGetValue(anchor, out var list) ? list : insertAfter[anchor] = []).Add(key);
+            }
+        }
+
+        var result = new JsonObject();
+        void Add(string key)
+        {
+            result[key] = defaults[key]?.DeepClone();
+            added.Add(prefix + key);
+        }
+
+        atStart.ForEach(Add);
+        foreach (var (key, value) in file.ToList())
+        {
+            file.Remove(key);
+            var defaultKey = defaultKeys.FirstOrDefault(k => string.Equals(k, key, StringComparison.OrdinalIgnoreCase));
+            result[key] = value is JsonObject child && defaultKey is not null && defaults[defaultKey] is JsonObject childDefaults
+                ? Complete(child, childDefaults, $"{prefix}{key}.", added)
+                : value;
+
+            if (insertAfter.TryGetValue(key, out var missing))
+            {
+                missing.ForEach(Add);
+            }
+        }
+
+        return result;
+    }
+
+    private static JsonObject ToDocument(AppSettings settings) =>
+        WithPasswordPlaceholder(JsonSerializer.SerializeToNode(settings, SettingsJson.Options)!.AsObject());
+
+    private static bool HasComments(string text)
+    {
+        var reader = new Utf8JsonReader(
+            System.Text.Encoding.UTF8.GetBytes(text),
+            new JsonReaderOptions { CommentHandling = JsonCommentHandling.Allow, AllowTrailingCommas = true });
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.Comment)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task WriteAsync(string path, JsonObject document, CancellationToken cancellationToken)
+    {
         // Write to a temp file and swap it in, so a crash mid-write never leaves a truncated settings file.
         var tempPath = path + ".tmp";
         var stream = File.Create(tempPath);

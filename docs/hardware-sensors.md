@@ -98,7 +98,7 @@ Windows Firewall doesn't filter traffic within the same PC (loopback), so Smart 
 
 ## 6. Turn on the Hardware feature in Smart Home Relay
 
-Open `settings.json` (tray menu → **Settings**) and set:
+Open `settings.json` (tray menu → **Settings**). Smart Home Relay adds the `hardware` section under `features` the first time it starts after an update, turned off; if you don't see it, restart Smart Home Relay (a file with comments is left as is, so add the section by hand in that case). Then set:
 
 ```json
 "hardware": {
