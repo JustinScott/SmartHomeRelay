@@ -402,7 +402,7 @@ Behavior rules:
 
 ### 5.7 Candidate features for later (not v1)
 
-Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state, editing `discoveryPrefix` and `baseTopic` in the settings window (an Advanced section with a warning that changing them breaks existing automations).
+Automatic discovery of all LibreHardwareMonitor sensors, enabled in HA as needed (5.8), Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state, editing `discoveryPrefix` and `baseTopic` in the settings window (an Advanced section with a warning that changing them breaks existing automations).
 
 ### 5.8 Hardware sensors (LibreHardwareMonitor) — milestone 6
 
@@ -432,6 +432,7 @@ Reads a **LibreHardwareMonitor (LHM) that the user installs and runs** (elevated
   3. The version must be readable and at least 0.9.5.
   4. The first request carries no credentials. If a login is configured and the server answers without asking for it (no `401` with a Basic challenge), the source is `untrusted` and the password is never sent.
 - **Credentials:** LHM's web server login (`username`, `password`), with the password DPAPI-encrypted like the MQTT password (section 7). Basic auth over loopback only.
+- **Later (possible change): automatic discovery of all LHM sensors.** Instead of the curated list, publish every useful LHM sensor (temperatures, fans, power, clocks, loads, voltages; not network adapters, data counters, or fixed thresholds) on the same HA device, with readable names ("RX 6800 XT GPU Hot Spot") and keys derived from LHM's sensor IDs. Most start disabled (`enabled_by_default: false`); a few start on (CPU temperature, GPU hot spot, GPU watts, drive temperatures, spinning fans). Users enable and rename the rest in HA, with no settings to edit (`sensors` and `sensorOverrides` would go away). Needs: entities that can be added while the app runs (today a module's entities are fixed at startup), a cached sensor list for when LHM isn't running at startup, vanished sensors kept as unavailable rather than deleted (so HA customizations survive), and a tray item to remove missing ones. Cost: more MQTT traffic (disabled entities still get states, limited by the deadbands). Deferred by decision; the curated list stays for now.
 - **Later (not planned):** a provider interface so other read-only sources (NVIDIA NVML, AMD ADLX) plug in with one class and one registration line, compiled in, never loaded from a folder; and an optional SYSTEM sensor service hosting the LHM library, which would need pinned dependencies, a lock file, and signature, vulnerability and license checks first. Hardware control (fans, power limits) stays out of scope.
 
 ---|---|---|
