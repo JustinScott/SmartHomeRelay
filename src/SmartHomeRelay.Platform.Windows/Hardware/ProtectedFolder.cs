@@ -4,9 +4,11 @@ using System.Security.Principal;
 namespace SmartHomeRelay.Platform.Windows.Hardware;
 
 /// <summary>
-/// Decides whether a program file can only be changed by administrators (spec 5.8, anti-spoofing): neither
-/// the file nor its folder may give write, delete, or permission rights to everyone, signed-in users,
-/// the Users group, or the current (standard) user.
+/// Decides whether a program file can only be changed by administrators (spec 5.8, anti-spoofing). The
+/// threat is a program running as the signed-in user without elevation, so neither the file nor its folder
+/// may be owned by, or give write, delete, or permission rights to, the current user, Everyone,
+/// Authenticated Users, Users, or Interactive. The current user counts even when they are an administrator:
+/// under UAC their unelevated programs still carry the user's own identity (but not the Administrators group).
 /// </summary>
 internal static class ProtectedFolder
 {
@@ -27,8 +29,7 @@ internal static class ProtectedFolder
             }
 
             var untrusted = UntrustedSids();
-            return !GrantsWrite(file.GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)), untrusted)
-                && !GrantsWrite(directory.GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)), untrusted);
+            return IsProtected(file.GetAccessControl(), untrusted) && IsProtected(directory.GetAccessControl(), untrusted);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or InvalidOperationException or PrivilegeNotHeldException or IdentityNotMappedException)
         {
@@ -36,12 +37,28 @@ internal static class ProtectedFolder
         }
     }
 
-    /// <summary>True if any allow rule gives a write-like right to one of <paramref name="untrusted"/>.</summary>
+    /// <summary>
+    /// True if <paramref name="security"/> neither belongs to nor grants a write-like right to any of
+    /// <paramref name="untrusted"/>. An owner can always rewrite the permissions, so ownership counts too.
+    /// </summary>
+    internal static bool IsProtected(FileSystemSecurity security, IReadOnlySet<SecurityIdentifier> untrusted)
+    {
+        if (security.GetOwner(typeof(SecurityIdentifier)) is SecurityIdentifier owner && untrusted.Contains(owner))
+        {
+            return false;
+        }
+
+        return !GrantsWrite(security.GetAccessRules(true, true, typeof(SecurityIdentifier)), untrusted);
+    }
+
+    /// <summary>True if any allow rule that applies to the object itself gives a write-like right to one of <paramref name="untrusted"/>.</summary>
     internal static bool GrantsWrite(AuthorizationRuleCollection rules, IReadOnlySet<SecurityIdentifier> untrusted)
     {
         foreach (FileSystemAccessRule rule in rules)
         {
+            // Inherit-only rules (e.g. CREATOR OWNER on Program Files) only apply to new children.
             if (rule.AccessControlType == AccessControlType.Allow
+                && (rule.PropagationFlags & PropagationFlags.InheritOnly) == 0
                 && (rule.FileSystemRights & DangerousRights) != 0
                 && rule.IdentityReference is SecurityIdentifier sid
                 && untrusted.Contains(sid))
@@ -53,7 +70,8 @@ internal static class ProtectedFolder
         return false;
     }
 
-    private static HashSet<SecurityIdentifier> UntrustedSids()
+    /// <summary>Identities an unelevated program running as the current user has.</summary>
+    internal static HashSet<SecurityIdentifier> UntrustedSids()
     {
         var sids = new HashSet<SecurityIdentifier>
         {
@@ -63,8 +81,10 @@ internal static class ProtectedFolder
             new(WellKnownSidType.InteractiveSid, null),
         };
 
+        // Always, even for an administrator (regression: an elevated test run excluded the user, so a file in
+        // the user's own Temp folder was judged admin-only).
         using var identity = WindowsIdentity.GetCurrent();
-        if (identity.User is { } user && !new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
+        if (identity.User is { } user)
         {
             sids.Add(user);
         }

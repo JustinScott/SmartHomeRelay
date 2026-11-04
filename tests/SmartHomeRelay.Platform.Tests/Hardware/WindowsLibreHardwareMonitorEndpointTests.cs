@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Platform.Windows.Hardware;
 
@@ -63,6 +65,44 @@ public sealed class WindowsLibreHardwareMonitorEndpointTests : IDisposable
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void ProtectedFolder_CurrentUserIsAlwaysUntrusted_EvenWhenAdmin()
+    {
+        // Regression: when the tests ran elevated, the user's own SID was left out, so a file in their Temp
+        // folder (where the user has full control) counted as admin-only.
+        using var identity = WindowsIdentity.GetCurrent();
+
+        ProtectedFolder.UntrustedSids().ShouldContain(identity.User!);
+    }
+
+    [Fact]
+    public void ProtectedFolder_OwnedByAnUntrustedUser_IsNot()
+    {
+        // An owner can rewrite the permissions, so ownership alone disqualifies a file.
+        var everyone = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+        var security = new FileSecurity();
+        security.SetOwner(everyone);
+
+        ProtectedFolder.IsProtected(security, new HashSet<SecurityIdentifier> { everyone }).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ProtectedFolder_InheritOnlyRules_DoNotCount()
+    {
+        // Program Files gives CREATOR OWNER full control, but only for new children.
+        var users = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+        var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+        var security = new DirectorySecurity();
+        security.SetOwner(admins);
+        security.AddAccessRule(new FileSystemAccessRule(users, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.InheritOnly, AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(users, FileSystemRights.ReadAndExecute, AccessControlType.Allow));
+
+        ProtectedFolder.IsProtected(security, new HashSet<SecurityIdentifier> { users }).ShouldBeTrue();
+
+        security.AddAccessRule(new FileSystemAccessRule(users, FileSystemRights.Modify, AccessControlType.Allow));
+        ProtectedFolder.IsProtected(security, new HashSet<SecurityIdentifier> { users }).ShouldBeFalse();
     }
 
     [Fact]
