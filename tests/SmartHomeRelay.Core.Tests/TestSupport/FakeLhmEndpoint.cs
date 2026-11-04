@@ -9,7 +9,7 @@ internal sealed class FakeLhmEndpoint : ILibreHardwareMonitorEndpoint
 
     public LhmEndpointSnapshot Snapshot { get; set; } = Trusted(Tested);
 
-    public LhmHttpResult Response { get; set; } = new(LhmHttpOutcome.Ok, LhmFixtures.Box1);
+    public LhmHttpResult Response { get; set; } = new(LhmHttpOutcome.Ok, LhmFixtures.Synthetic);
 
     public int? SystemDisk { get; set; } = 0;
 

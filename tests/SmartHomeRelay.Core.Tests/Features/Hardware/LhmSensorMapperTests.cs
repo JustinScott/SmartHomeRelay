@@ -7,7 +7,7 @@ public sealed class LhmSensorMapperTests
 {
     private static readonly Dictionary<string, string> NoOverrides = [];
 
-    private static IReadOnlyList<LhmSensor> Box1 => LhmDataParser.Parse(LhmFixtures.Box1).Sensors;
+    private static IReadOnlyList<LhmSensor> Box1 => LhmDataParser.Parse(LhmFixtures.Synthetic).Sensors;
 
     [Fact]
     public void CpuTemperature_Amd_IsTctlTdie()

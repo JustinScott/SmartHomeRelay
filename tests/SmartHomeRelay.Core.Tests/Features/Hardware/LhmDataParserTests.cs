@@ -8,7 +8,7 @@ public sealed class LhmDataParserTests
     [Fact]
     public void Parse_Box1_FindsSensorsUnderTheirHardware()
     {
-        var result = LhmDataParser.Parse(LhmFixtures.Box1);
+        var result = LhmDataParser.Parse(LhmFixtures.Synthetic);
 
         result.IsValid.ShouldBeTrue(result.Problem);
         var tctl = result.Sensors.Single(s => s.SensorId == "/amdcpu/0/temperature/2");
@@ -25,7 +25,7 @@ public sealed class LhmDataParserTests
     [Fact]
     public void Parse_SensorWithoutReading_HasNoValue()
     {
-        var hotSpot = LhmDataParser.Parse(LhmFixtures.Box1).Sensors.Single(s => s.SensorId == "/gpu-amd/0/temperature/2");
+        var hotSpot = LhmDataParser.Parse(LhmFixtures.Synthetic).Sensors.Single(s => s.SensorId == "/gpu-amd/0/temperature/2");
 
         hotSpot.Value.ShouldBeNull();
         hotSpot.Unit.ShouldBe("°C");
@@ -88,7 +88,7 @@ public sealed class LhmDataParserTests
     public void Parse_SensorMissingAField_IsAFormatProblem(string property)
     {
         // E.g. LHM before 0.9.5 had no RawValue: never fall back to the display Value.
-        var result = LhmDataParser.Parse(LhmFixtures.Without(LhmFixtures.Box1, "/amdcpu/0/load/0", property));
+        var result = LhmDataParser.Parse(LhmFixtures.Without(LhmFixtures.Synthetic, "/amdcpu/0/load/0", property));
 
         result.IsValid.ShouldBeFalse();
         result.Problem!.ShouldContain(property);

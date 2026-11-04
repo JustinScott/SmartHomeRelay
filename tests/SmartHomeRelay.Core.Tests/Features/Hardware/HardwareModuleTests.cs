@@ -123,7 +123,7 @@ public sealed class HardwareModuleTests : IAsyncDisposable
     public async Task Sample_DataFormatChanged_IsIncompatible_PublishesNothingAndNamesTheWorkingVersion()
     {
         await StartAsync();
-        _endpoint.Response = new(LhmHttpOutcome.Ok, LhmFixtures.Without(LhmFixtures.Box1, "/amdcpu/0/temperature/2", "RawValue"));
+        _endpoint.Response = new(LhmHttpOutcome.Ok, LhmFixtures.Without(LhmFixtures.Synthetic, "/amdcpu/0/temperature/2", "RawValue"));
 
         await _module.SampleAsync(Ct);
 
@@ -218,7 +218,7 @@ public sealed class HardwareModuleTests : IAsyncDisposable
         _endpoint.Response = new(LhmHttpOutcome.LoginFailed);
         await _module.SampleAsync(Ct);
 
-        _endpoint.Response = new(LhmHttpOutcome.Ok, LhmFixtures.Box1);
+        _endpoint.Response = new(LhmHttpOutcome.Ok, LhmFixtures.Synthetic);
         await _module.SampleAsync(Ct);
         _context.Count("cpu_temperature").ShouldBe(2, "values are republished after a problem, even if unchanged");
         _context.Latest("hardware_status").ShouldBe("ok");
@@ -240,6 +240,27 @@ public sealed class HardwareModuleTests : IAsyncDisposable
         _context.Latest("ssd_temperature").ShouldBe(HardwareModule.UnknownPayload);
         _context.Count("ssd_temperature").ShouldBe(1);
         _context.Latest("cpu_temperature").ShouldBe("47");
+    }
+
+    [Fact]
+    public async Task Box1Capture_FanNeedsAnOverride_EverythingElseWorks()
+    {
+        // BOX1's board names its fans "Fan #1".."Fan #5": cpu_fan is unknown until an override is set,
+        // while the status stays ok (spec 5.8: one unmatched sensor never pauses the others).
+        _endpoint.Response = new(LhmHttpOutcome.Ok, LhmFixtures.Box1);
+        _endpoint.SystemDisk = 2;
+        await StartAsync();
+
+        await _module.SampleAsync(Ct);
+        _context.Latest("cpu_fan").ShouldBe(HardwareModule.UnknownPayload);
+        _context.Latest("cpu_temperature").ShouldBe("57");
+        _context.Latest("ssd_temperature").ShouldBe("44");
+        _context.Latest("hardware_status").ShouldBe("ok");
+
+        // Overrides are read on every sample: no restart needed.
+        _settings.Set(WithHardware(h => h.SensorOverrides["cpu_fan"] = "/lpc/it8688e/0/fan/0"));
+        await _module.SampleAsync(Ct);
+        _context.Latest("cpu_fan").ShouldBe("1281");
     }
 
     [Fact]

@@ -122,14 +122,21 @@ When you save, Smart Home Relay encrypts the password (Windows DPAPI) and remove
 
 ### If a sensor shows "Unknown"
 
-The built-in rule didn't find a match, for example because your motherboard's fans are named "Fan #1", "Fan #2" in LHM. Point the sensor at the right one:
+The built-in rule didn't find a match, for example because your motherboard's fans are named "Fan #1", "Fan #2" in LHM (many Gigabyte boards do). Smart Home Relay doesn't guess; point the sensor at the right one:
 
-1. Open <http://127.0.0.1:8085/data.json> in a browser on this PC and sign in.
-2. Find the sensor (e.g. the fan whose RPM matches your CPU cooler) and copy its `SensorId`, such as `/lpc/nct6798d/0/fan/1`.
-3. Add it to `settings.json` and save:
+1. List the fans with their IDs and current speeds (Windows PowerShell; in PowerShell 7 add `-AllowUnencryptedAuthentication`, which is safe here because the traffic never leaves the PC). Enter LHM's web server login when asked:
+
+   ```powershell
+   $d = Invoke-RestMethod http://127.0.0.1:8085/data.json -Credential (Get-Credential) -UseBasicParsing
+   function Walk($n) { if ($n.Type -eq 'Fan') { '{0,-30} {1,-10} {2}' -f $n.SensorId, $n.RawValue, $n.Text }; foreach ($c in $n.Children) { Walk $c } }
+   Walk $d
+   ```
+
+2. Pick the fan whose RPM matches your CPU cooler (your BIOS fan page shows which header it's on) and copy its ID, such as `/lpc/it8688e/0/fan/0`.
+3. Add it to `settings.json` and save. It applies on the next reading, no restart needed:
 
    ```json
-   "sensorOverrides": { "cpu_fan": "/lpc/nct6798d/0/fan/1" }
+   "sensorOverrides": { "cpu_fan": "/lpc/it8688e/0/fan/0" }
    ```
 
 Don't hide the sensors you use in LHM's window; hidden sensors may drop out of its web data.

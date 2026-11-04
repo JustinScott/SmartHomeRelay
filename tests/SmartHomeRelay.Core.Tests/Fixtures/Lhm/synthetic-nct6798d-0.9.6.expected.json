@@ -1,0 +1,11 @@
+{
+  "comment": "Built from LHM 0.9.6's HttpServer.GenerateJsonForNode with a Nuvoton NCT6798D board whose fan is named \"CPU Fan\".",
+  "systemDisk": 0,
+  "overrides": {},
+  "sensors": {
+    "cpu_temperature": "/amdcpu/0/temperature/2",
+    "cpu_fan": "/lpc/nct6798d/0/fan/1",
+    "ssd_temperature": "/nvme/0/temperature/0"
+  },
+  "unmatchedWithoutOverrides": []
+}

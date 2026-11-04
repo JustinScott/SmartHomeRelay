@@ -1,0 +1,11 @@
+{
+  "comment": "BOX1: Gigabyte X570 AORUS ELITE WIFI (ITE IT8688E), Ryzen 7 5800X3D, RX 6800 XT. Its fans are named Fan #1..#5, so cpu_fan needs an override. systemDisk is the Windows disk number the test passes in.",
+  "systemDisk": 2,
+  "overrides": { "cpu_fan": "/lpc/it8688e/0/fan/0" },
+  "sensors": {
+    "cpu_temperature": "/amdcpu/0/temperature/2",
+    "cpu_fan": "/lpc/it8688e/0/fan/0",
+    "ssd_temperature": "/nvme/2/temperature/0"
+  },
+  "unmatchedWithoutOverrides": ["cpu_fan"]
+}

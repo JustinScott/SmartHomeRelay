@@ -682,12 +682,12 @@ Conventions:
 - Verified on BOX1 (milestone 6): CPU, memory, disk, and GPU match Task Manager. Network is an average over the sample interval, so it is smoother than Task Manager's 1-second view; accepted as is.
 - Added after milestone 6, verified with `tools/probe-sensors.ps1` on BOX1 (Ryzen 7 5800X3D, AMD GPU) as a standard user: `cpu_power` (Energy Meter), `gpu_temperature` and `gpu_power_level` (D3DKMT adapter perf data). CPU temperature is not available without a driver.
 - Hardware sensors (CPU temperature, fans) come from a LibreHardwareMonitor the user installs and manages, read through its local web server (5.8). Chosen over a bundled elevated sensor service: no elevation, driver, or new packages in the app, and all sensors stay on one HA device. Use this feature or HA's LHM integration, not both. Moved into milestone 6 so all metrics are settled before milestone 7.
+- Verified on BOX1 (hardware sensors, LHM 0.9.6 with PawnIO): `hardware_status` is `ok`, so the anti-spoofing checks pass against the real LHM; CPU and SSD temperatures map by rule. BOX1's Gigabyte board (ITE IT8688E) names its fans "Fan #1".."Fan #5", so `cpu_fan` needs a `sensorOverrides` entry, as designed (the rules never guess). Its real `data.json` is a test fixture.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
 - Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).
 
 **Open**
 
-- [ ] Hardware sensors (5.8, milestone 6): replace the synthetic fixture with BOX1's real `data.json` (LHM 0.9.6 with PawnIO) and confirm the mapped sensors; verify on BOX1 that LHM's port is owned by the System process (HTTP.sys).
 - [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.
