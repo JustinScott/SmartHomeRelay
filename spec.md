@@ -157,6 +157,7 @@ Behavior of the host (`Core/Hosting/ModuleHost`), implemented in milestone 2:
 - `PublishStateAsync` can be called at any time, including while disconnected. The host keeps the latest value per entity and publishes all of them after every (re)connect and when HA restarts, so modules never track the connection.
 - Commands run on background tasks, never inside the MQTT receive callback, so a slow handler never delays other commands. Commands for a disabled module's entities are ignored.
 - A module whose entities break the rules (invalid or duplicate key, command entity without a handler, number without a range) is rejected as a whole and logged; the others run normally.
+- **Custom discovery (planned, milestone 8, for 5.9):** a module may also describe a *custom component* that the standard entity types can't express (the `media_player` from the MQTT Media Player add-on). It supplies the discovery config and its own state and command topics, all under `{baseTopic}/{deviceId}/{module id}/…`. The host publishes, retains, republishes and clears that config like any other discovery, routes the module's command topics to it, and keeps the latest value per state topic for republishing. The `device` block is the same as for every other entity, so it lands on the same HA device.
 
 Rules for modules:
 
@@ -323,9 +324,11 @@ Implementation details (milestone 5):
 | `volume` | number (0–100) | Default output device master volume |
 | `muted` | switch | Default output device mute |
 | `mic_muted` | switch | Default capture device mute |
-| `output_device` | sensor | Name of the current default output device |
+| `output_device` | select | The current default output device; choosing another option makes it the default. Options are the active playback devices by name |
 
-- Must handle default-device changes at runtime (headphones plugged in, etc.) via MMDevice notifications.
+- Must handle default-device changes at runtime (headphones plugged in, etc.) via MMDevice notifications, and update `output_device`'s options when devices are added or removed.
+- `mic_muted` both shows and changes whether the default microphone is muted (decided before milestone 7).
+- Needs a new entity type, `select` (HA MQTT `select`: `options`, `state_topic`, `command_topic`), added to the shared entity abstractions with snapshot tests.
 
 ### 5.5 System Metrics
 
@@ -402,7 +405,7 @@ Behavior rules:
 
 ### 5.7 Candidate features for later (not v1)
 
-Automatic discovery of all LibreHardwareMonitor sensors, enabled in HA as needed (5.8), Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state, editing `discoveryPrefix` and `baseTopic` in the settings window (an Advanced section with a warning that changing them breaks existing automations).
+Media player album art (5.9), Windows notification sounds through the notification `Audio` field, a "play sound from URL" command, a voice satellite (wake word, Assist pipeline, echo cancellation; likely a separate project), Automatic discovery of all LibreHardwareMonitor sensors, enabled in HA as needed (5.8), Display brightness (internal panels via WMI, external monitors via DDC/CI), toast action buttons that publish click events back to HA, active window/app name, webcam in use, mic in use, media play/pause/next, battery status (laptops), pending Windows updates, screenshot camera entity, launch allowlisted apps, Bluetooth device state, editing `discoveryPrefix` and `baseTopic` in the settings window (an Advanced section with a warning that changing them breaks existing automations).
 
 ### 5.8 Hardware sensors (LibreHardwareMonitor) — milestone 6
 
@@ -435,6 +438,22 @@ Reads a **LibreHardwareMonitor (LHM) that the user installs and runs** (elevated
 - **Later (possible change): automatic discovery of all LHM sensors.** Instead of the curated list, publish every useful LHM sensor (temperatures, fans, power, clocks, loads, voltages; not network adapters, data counters, or fixed thresholds) on the same HA device, with readable names ("RX 6800 XT GPU Hot Spot") and keys derived from LHM's sensor IDs. Most start disabled (`enabled_by_default: false`); a few start on (CPU temperature, GPU hot spot, GPU watts, drive temperatures, spinning fans). Users enable and rename the rest in HA, with no settings to edit (`sensors` and `sensorOverrides` would go away). Needs: entities that can be added while the app runs (today a module's entities are fixed at startup), a cached sensor list for when LHM isn't running at startup, vanished sensors kept as unavailable rather than deleted (so HA customizations survive), and a tray item to remove missing ones. Cost: more MQTT traffic (disabled entities still get states, limited by the deadbands). Deferred by decision; the curated list stays for now.
 - **Later (not planned):** a provider interface so other read-only sources (NVIDIA NVML, AMD ADLX) plug in with one class and one registration line, compiled in, never loaded from a folder; and an optional SYSTEM sensor service hosting the LHM library, which would need pinned dependencies, a lock file, and signature, vulnerability and license checks first. Hardware control (fans, power limits) stays out of scope.
 
+
+### 5.9 Media player (via the MQTT Media Player add-on) — milestone 8
+
+Makes the PC a `media_player` entity in HA, so it appears wherever HA asks which player to use: the media browser, text-to-speech, and `media_player.play_media` in automations. HA's built-in MQTT integration has no `media_player` type, so this uses the community **MQTT Media Player** custom integration ([bkbilly/mqtt_media_player](https://github.com/bkbilly/mqtt_media_player), MIT, installed through HACS). Tested version: to be pinned when the milestone is built (2026.10.0 or later). Without the add-on, HA simply ignores these messages.
+
+- **Off by default** (`features.mediaPlayer.enabled`). Turning it off clears the discovery config.
+- **Discovery:** a retained config on `{discoveryPrefix}/media_player/{deviceId}/config`, using the add-on's keys (`state_*_topic`, `command_*_topic`), with the same `device` block as every other entity (so it joins the existing device) and `availability` on our `status` topic. Built through the custom discovery support in 3.3; snapshot-tested.
+- **Topics** (a compatibility contract once shipped): state under `{baseTopic}/{deviceId}/media_player/{state|title|artist|album|duration|position|volume|mute|media_type}`; commands under `{baseTopic}/{deviceId}/media_player/command/{play|pause|playpause|next|previous|volume|mute|seek|play_media}`. Payloads are the add-on's defaults: `Play`, `Pause`, `PlayPause`, `Next`, `Previous`; volume `0.0`–`1.0`; mute `mute`/`unmute`; seek in seconds; play media as JSON `{ "media_type": …, "media_id": … }`.
+- **What the entity shows (decided):** it **mirrors the Windows media session**, i.e. whatever Windows' media controls show (Spotify, browsers, most players), read through Windows' built-in media session API (`GlobalSystemMediaTransportControlsSessionManager`, standard user, no package). State `playing`, `paused`, or `idle` (no session); title, artist, album, duration, position. While an announcement from HA plays, the session keeps being mirrored (an announcement plays over the music, see ducking).
+- **Commands:** play, pause, play/pause, next, previous, and seek go to the current Windows media session. Volume and mute control the default output device's master volume, the same code as 5.4's `volume` and `muted`, so the entities stay in sync.
+- **Playing what HA sends (`play_media`, used for TTS and the media browser):** `media_id` must be an `http`/`https` URL (never a local path, file URL, or anything else; spec 12). The audio is downloaded first, with a size limit and a timeout, and only audio content types are accepted. Played with Windows' built-in media playback (`Windows.Media.Playback`, no package) on the default output device. One announcement at a time: a new one replaces the one playing.
+- **Ducking (decided: the app does it itself):** while an announcement plays, every other app's audio session on the default output device is faded (~300 ms) down to `duckLevelPercent` of its own volume, and faded back to exactly its previous level ~0.5 s after the announcement ends. Back-to-back announcements keep the duck. If the user changes an app's volume during the duck, their setting wins. The original levels are saved before ducking and restored on the next start or wake if the app stops or the PC sleeps mid-announcement. Apps in exclusive audio mode can't be ducked. `interruption: "pause"` pauses the media session instead (and resumes it afterwards) for users who prefer that.
+- **Reporting:** state, metadata, volume, and mute on change; position every `positionIntervalSeconds` (default 5) while playing and on seek or track change.
+- **Album art:** on the to-do list (see 5.7), not in the first version.
+- **Settings:** `features.mediaPlayer` = `enabled` (false), `interruption` (`duck` | `pause`, default `duck`), `duckLevelPercent` (default 20), `maxDownloadBytes` (default 20 MB), `downloadTimeoutSeconds` (default 15), `positionIntervalSeconds` (default 5).
+- **Trust:** the add-on is third-party Python running inside HA with full access to it. The setup guide (`docs/media-player.md`) says to read it, install the tested version in HACS, and update deliberately. Any MQTT client allowed to publish our command topics can play sounds, the same trust as the existing command entities.
 ---|---|---|
 | `cpu_temperature` | °C | CPU package temperature (AMD Tctl/Tdie, Intel CPU Package) |
 | `cpu_fan` | RPM | The motherboard fan the user maps as the CPU fan |
@@ -490,7 +509,7 @@ Notes:
 - File: `%APPDATA%\SmartHomeRelay\settings.json`. Created with defaults on first run.
 - Bound via the Options pattern; validated on load and on save (invalid values rejected with clear messages in the UI).
 - **MQTT password** is stored encrypted using DPAPI (`ProtectedData`, `CurrentUser` scope). Never logged. The app never writes it in plain text.
-- **Entering the password by hand:** the file always contains an empty `"password": ""` field right after `username`, so the user can see where to type (milestone 2 finding: without it, the password was typed into `passwordProtected`, which only holds encrypted values). The user types the password there. When the app loads the file it encrypts the value into `passwordProtected` and rewrites the file without the plain-text field, so plain text exists only between the user saving and the app picking up the change. This is how the password is set until the settings window exists (milestone 9).
+- **Entering the password by hand:** the file always contains an empty `"password": ""` field right after `username`, so the user can see where to type (milestone 2 finding: without it, the password was typed into `passwordProtected`, which only holds encrypted values). The user types the password there. When the app loads the file it encrypts the value into `passwordProtected` and rewrites the file without the plain-text field, so plain text exists only between the user saving and the app picking up the change. This is how the password is set until the settings window exists (milestone 10).
 - **First run:** when the app creates `settings.json`, it opens the file in the user's default editor for `.json` files (Notepad if there is none) and shows a tray balloon explaining what to fill in. Saved changes are applied without a restart.
 
 ```json
@@ -512,6 +531,7 @@ Notes:
     "audio":    { "enabled": true },
     "metrics":  { "enabled": true, "intervalSeconds": 30 },
     "notifications": { "enabled": true, "imageDownloadTimeoutSeconds": 10, "imageMaxBytes": 10485760 },
+    "mediaPlayer": { "enabled": false, "interruption": "duck", "duckLevelPercent": 20, "maxDownloadBytes": 20971520, "downloadTimeoutSeconds": 15, "positionIntervalSeconds": 5 },
     "hardware": { "enabled": false, "port": 8085, "username": "", "passwordProtected": "", "intervalSeconds": 30, "sensors": ["cpu_temperature", "cpu_fan", "ssd_temperature"], "sensorOverrides": {} }
   },
   "startWithWindows": true,
@@ -530,7 +550,7 @@ Notes:
 
 - Tabs or sections: **Connection** (host, port, username, password, **Test connection** button), **Device** (name, ID), **Features** (toggles and per-feature options), **General** (start with Windows, log level).
 - The form is a thin view. A `SettingsPresenter` (in `App/Settings/`, depending only on abstractions) holds validation and save logic and is unit-testable.
-- Tray menu: status (connected / disconnected), Settings, Reconnect, Pause/Resume reporting, Open logs folder, Exit. Items are added in the milestone that implements them; the menu never shows placeholder items. Until the settings window exists (milestone 9), **Settings** opens `settings.json` in the default editor. **Reconnect** publishes `offline`, disconnects, and connects again immediately.
+- Tray menu: status (connected / disconnected), Settings, Reconnect, Pause/Resume reporting, Open logs folder, Exit. Items are added in the milestone that implements them; the menu never shows placeholder items. Until the settings window exists (milestone 10), **Settings** opens `settings.json` in the default editor. **Reconnect** publishes `offline`, disconnects, and connects again immediately.
 - Launching the app while it is already running: the running copy shows a tray balloon ("Smart Home Relay is already running") and the new process exits.
 - "Start with Windows" toggles the per-user `Run` registry value, the same one the installer creates.
 
@@ -612,7 +632,7 @@ Conventions:
 - The app only talks to the configured broker (plus HTTP(S) image downloads for notifications, with size and time limits, and, when the Hardware feature is on, `GET /data.json` from LibreHardwareMonitor on `127.0.0.1` with the checks in 5.8).
 - **No credentials, IP addresses, or host names in source code** (the prototype hardcoded them). They live only in settings, with the password DPAPI-encrypted. Rotate any credential that was ever committed to source control.
 - Repository hygiene: enable GitHub secret scanning and push protection. `settings.json` lives in `%APPDATA%`, outside the repo, so it cannot be committed by accident.
-- Notification image paths and activation URLs are validated as described in 5.6 (`http`/`https` URLs only; no local file access).
+- Notification image paths and activation URLs are validated as described in 5.6 (`http`/`https` URLs only; no local file access). The same applies to media player `play_media` URLs (5.9), which also have a download size limit, a timeout, and an audio-only content type check.
 - No arbitrary command or script execution from MQTT in v1. Only the fixed, enumerated commands above.
 - Destructive power commands are opt-in.
 - Consider broker ACLs scoped to `{baseTopic}/{deviceId}/#` and `{discoveryPrefix}/#/{deviceId}/#`.
@@ -649,9 +669,10 @@ Conventions:
 4. **Presence** module.
 5. **Power** module.
 6. **Metrics** module, plus hardware sensors from a user-managed LibreHardwareMonitor (5.8).
-7. **Display** and **Audio** modules.
-8. **Notifications** module.
-9. **Settings window** polish and installer.
+7. **Display** and **Audio** modules (including `mic_muted` and the `output_device` select).
+8. **Media player** via the MQTT Media Player add-on (5.9), with custom discovery (3.3) and ducking.
+9. **Notifications** module.
+10. **Settings window** polish and installer.
 
 ---
 
@@ -676,8 +697,8 @@ Conventions:
 - HA device manufacturer is `Smart Home Relay`.
 - `unique_id` uses the lowercased, underscore-sanitized device ID (section 4.1).
 - Shutdown and restart wait `shutdownDelaySeconds` (default 60s). Sleep and lock have no toggle.
-- Until milestone 9, settings are edited in `settings.json` directly: it opens on first run, and a plain `password` field is encrypted automatically.
-- The settings window stays in milestone 9. Editable topic settings are a later enhancement (5.7).
+- Until milestone 10, settings are edited in `settings.json` directly: it opens on first run, and a plain `password` field is encrypted automatically.
+- The settings window is milestone 10 (was 9 before the media player milestone was added). Editable topic settings are a later enhancement (5.7).
 - MQTT broker integration tests run in a Linux CI job.
 - Verified on the real broker and HA (milestone 4): sleep/wake, lock/unlock, and a Home Assistant restart (the app republishes status, discovery, and state).
 - Verified on BOX1 (milestone 5): Lock, Sleep (true sleep), Shutdown with the 60s Windows countdown, Cancel shutdown, and the allowShutdown setting taking effect without a restart.
@@ -687,9 +708,11 @@ Conventions:
 - Verified on BOX1 (hardware sensors, LHM 0.9.6 with PawnIO): `hardware_status` is `ok`, so the anti-spoofing checks pass against the real LHM; CPU and SSD temperatures map by rule. BOX1's Gigabyte board (ITE IT8688E) names its fans "Fan #1".."Fan #5", so `cpu_fan` needs a `sensorOverrides` entry, as designed (the rules never guess). Its real `data.json` is a test fixture.
 - Verified on BOX1 (milestone 6 complete): CPU, memory, disk, network and GPU usage match Task Manager; CPU power, GPU temperature and GPU power level appear; hardware sensors from LHM 0.9.6 read `ok` with plausible values (CPU fan via `sensorOverrides`); Windows tests pass on BOX1 and in CI (run #10, after fixing the protected-folder check that failed when tests ran elevated).
 - An existing `settings.json` gains settings added in newer versions automatically at startup (section 7), instead of users pasting them in.
+- Media player (5.9, decided before milestone 7): the PC becomes a `media_player` through the MQTT Media Player HACS add-on (option B), chosen over a DLNA renderer (no new network listener) and a custom HA integration (too large). It mirrors the Windows media session; announcements play over it with the app ducking other apps itself; album art is deferred. New milestone 8, after Display and Audio; Notifications and the settings window move to 9 and 10.
+- Audio additions (decided before milestone 7): `mic_muted` switch (show and change the default mic's mute) and `output_device` as a `select` to change the default output device.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
 - MQTT 3.1.1; device ID limited to letters, digits, `-`, `_` (milestone 2).
-- Until milestone 9 the tray's Settings item opens `settings.json` (milestone 2).
+- Until milestone 10 the tray's Settings item opens `settings.json` (milestone 2).
 
 **Open**
 

@@ -54,7 +54,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
 
-        // Until the settings window exists (milestone 9), Settings opens settings.json (spec 7).
+        // Until the settings window exists (milestone 10), Settings opens settings.json (spec 7).
         _menu.Items.Add("Settings", null, (_, _) => _shell.OpenFile(_paths.SettingsFilePath));
         _menu.Items.Add("Reconnect", null, (_, _) => _reconnect.RequestReconnect());
         _menu.Items.Add("Open logs folder", null, (_, _) => _shell.OpenFolder(_paths.LogsDirectory));
