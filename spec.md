@@ -719,6 +719,7 @@ Conventions:
 - Verified on BOX1 (hardware sensors, LHM 0.9.6 with PawnIO): `hardware_status` is `ok`, so the anti-spoofing checks pass against the real LHM; CPU and SSD temperatures map by rule. BOX1's Gigabyte board (ITE IT8688E) names its fans "Fan #1".."Fan #5", so `cpu_fan` needs a `sensorOverrides` entry, as designed (the rules never guess). Its real `data.json` is a test fixture.
 - Verified on BOX1 (milestone 6 complete): CPU, memory, disk, network and GPU usage match Task Manager; CPU power, GPU temperature and GPU power level appear; hardware sensors from LHM 0.9.6 read `ok` with plausible values (CPU fan via `sensorOverrides`); Windows tests pass on BOX1 and in CI (run #10, after fixing the protected-folder check that failed when tests ran elevated).
 - An existing `settings.json` gains settings added in newer versions automatically at startup (section 7), instead of users pasting them in.
+- Verified on BOX1 (milestone 7 complete): Monitor off/on, volume slider, mute, microphone mute, and output device switching work from HA, and Windows-side changes show up in HA; Windows tests pass on BOX1 and in CI (run #11).
 - Milestone 7 decisions: Core Audio through our own COM interop instead of NAudio (nothing to pin or vet); volume as a slider; Presence ignores the Monitor on mouse nudge.
 - Media player (5.9, decided before milestone 7): the PC becomes a `media_player` through the MQTT Media Player HACS add-on (option B), chosen over a DLNA renderer (no new network listener) and a custom HA integration (too large). It mirrors the Windows media session; announcements play over it with the app ducking other apps itself; album art is deferred. New milestone 8, after Display and Audio; Notifications and the settings window move to 9 and 10.
 - Audio additions (decided before milestone 7): `mic_muted` switch (show and change the default mic's mute) and `output_device` as a `select` to change the default output device.
@@ -728,5 +729,6 @@ Conventions:
 
 **Open**
 
+- [ ] Check whether Monitor on wakes the display while the PC is locked (5.3); the mouse nudge may not count as input on the lock screen.
 - [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.
