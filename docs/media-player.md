@@ -31,9 +31,16 @@ The add-on is third-party Python code that runs inside Home Assistant with full 
 
 1. In Home Assistant open **HACS** and search for **MQTT Media Player**. If it isn't listed, add it as a custom repository: **⋮ → Custom repositories**, URL `https://github.com/bkbilly/mqtt_media_player`, type **Integration**.
 2. Open it, choose **Download**, and pick version **2026.10.1**.
-3. Restart Home Assistant.
+3. Add this line on its own to `configuration.yaml` (for example with the File editor app), at the top level, not indented under another section:
 
-There's nothing to set up in the add-on itself. It creates the player when Smart Home Relay announces it.
+   ```yaml
+   mqtt_media_player:
+   ```
+
+   The add-on's own documentation doesn't mention this, but without it Home Assistant never starts the add-on, so it never sees the player. (The add-on only starts listening from its setup code, which Home Assistant runs only for integrations that are in `configuration.yaml` or already have an entry.)
+4. Check the configuration (**Developer tools → YAML → Check configuration**), then **Restart Home Assistant**. A quick reload isn't enough.
+
+There's nothing else to set up in the add-on. After that it creates the player when Smart Home Relay announces it.
 
 ## 2. Check Home Assistant's local address
 
@@ -92,7 +99,7 @@ Open `settings.json` (tray menu → **Settings**). The `mediaPlayer` section und
 
 | Symptom | What to do |
 |---|---|
-| No media player in Home Assistant | Check that the add-on is installed (step 1) and Home Assistant was restarted. If you changed `mqtt.discoveryPrefix` from `homeassistant`, the log says so: the add-on only listens on `homeassistant`, so Smart Home Relay always publishes the player there. |
+| No media player in Home Assistant | Check that the add-on is installed, `mqtt_media_player:` is in `configuration.yaml`, and Home Assistant was restarted (step 1). If you changed `mqtt.discoveryPrefix` from `homeassistant`, the log says so: the add-on only listens on `homeassistant`, so Smart Home Relay always publishes the player there. |
 | Player shows nothing while music plays | The app must show up in Windows' media controls (the volume flyout's media panel). Some apps don't use them. |
 | TTS or media doesn't play | Open the log (tray menu → **Open logs folder**). "Could not download the audio from …" names the host and the reason: check step 2 (address, certificate, firewall). "not audio/*" means the link wasn't an audio file. |
 | Other apps stayed quiet | Restart Smart Home Relay; it restores the saved levels. If you'd changed them meanwhile, set them in Windows' volume mixer. |
