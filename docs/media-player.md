@@ -62,7 +62,8 @@ Open `settings.json` (tray menu → **Settings**). The `mediaPlayer` section und
   "duckLevelPercent": 20,
   "maxDownloadBytes": 20971520,
   "downloadTimeoutSeconds": 15,
-  "positionIntervalSeconds": 5
+  "positionIntervalSeconds": 5,
+  "showNotification": true
 }
 ```
 
@@ -73,6 +74,7 @@ Open `settings.json` (tray menu → **Settings**). The `mediaPlayer` section und
 | `maxDownloadBytes` | 20 MB | Largest file that will be played. |
 | `downloadTimeoutSeconds` | `15` | Longest the download may take. |
 | `positionIntervalSeconds` | `5` | How often the playback position is sent while playing. |
+| `showNotification` | `true` | While Home Assistant's audio plays, show a silent "Home Assistant is speaking" notification with a **Stop** button. It disappears when the audio ends and leaves nothing in the notification center. |
 
 ## 4. Check it
 

@@ -19,6 +19,7 @@ public sealed class MediaPlayerModuleTests : IAsyncDisposable
     private readonly FakeAnnouncementPlayer _player = new();
     private readonly FakeAudioDucker _ducker = new();
     private readonly FakeHttpDownloader _downloader = new();
+    private readonly FakeToastPresenter _toasts = new();
     private readonly FakeTimeProvider _time = new();
     private readonly FakeSettingsState _settings;
     private readonly RecordingModuleContext _context = new();
@@ -29,7 +30,7 @@ public sealed class MediaPlayerModuleTests : IAsyncDisposable
         var settings = FakeSettingsState.Configured();
         settings.Features.MediaPlayer.Enabled = true;
         _settings = new FakeSettingsState(settings);
-        _module = new MediaPlayerModule(_settings, _session, _audio, _player, _ducker, _downloader, _time);
+        _module = new MediaPlayerModule(_settings, _session, _audio, _player, _ducker, _downloader, _toasts, _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -229,6 +230,72 @@ public sealed class MediaPlayerModuleTests : IAsyncDisposable
         await AdvanceUntilAsync(playing);
 
         _ducker.Calls.ShouldBe(["duck:0.2", "restore"]);
+    }
+
+    [Fact]
+    public async Task PlayMedia_ShowsTheSpeakingNotice_AndRemovesItWhenDone()
+    {
+        await _module.StartAsync(_context, Ct);
+
+        var playing = Command("play_media", Url, Ct);
+        await Eventually.TrueAsync(() => _player.Started == 1, "the announcement starts");
+        var notice = _toasts.Shown.ShouldHaveSingleItem();
+        notice.Silent.ShouldBeTrue();
+        notice.Tag.ShouldBe(MediaAnnouncer.NoticeTag);
+        notice.Buttons.ShouldHaveSingleItem().OpensUrl.ShouldBeFalse();
+
+        _player.Finish();
+        await AdvanceUntilAsync(playing);
+
+        _toasts.Removed.ShouldBe([(MediaAnnouncer.NoticeTag, MediaAnnouncer.NoticeGroup)]);
+    }
+
+    [Fact]
+    public async Task PlayMedia_StopOnTheNotice_StopsAndRestores()
+    {
+        await _module.StartAsync(_context, Ct);
+        _ducker.Calls.Clear();
+
+        var playing = Command("play_media", Url, Ct);
+        await Eventually.TrueAsync(() => _player.Started == 1, "the announcement starts");
+        _toasts.Click(MediaAnnouncer.StopArguments);
+        await playing;
+
+        await Eventually.TrueAsync(() => _ducker.Calls.Contains("restore") && !_toasts.Removed.IsEmpty, "the duck and the notice end");
+        _player.Events.ShouldContain("stopped");
+    }
+
+    [Fact]
+    public async Task PlayMedia_NoticeTurnedOff_ShowsNothing()
+    {
+        var settings = FakeSettingsState.Configured();
+        settings.Features.MediaPlayer.Enabled = true;
+        settings.Features.MediaPlayer.ShowNotification = false;
+        _settings.Set(settings);
+        _player.Instant = true;
+        await _module.StartAsync(_context, Ct);
+
+        await AdvanceUntilAsync(Command("play_media", Url, Ct));
+
+        _toasts.Shown.ShouldBeEmpty();
+        _toasts.Removed.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task PlayMedia_BackToBack_KeepsOneNotice()
+    {
+        await _module.StartAsync(_context, Ct);
+
+        var first = Command("play_media", Url, Ct);
+        await Eventually.TrueAsync(() => _player.Started == 1, "the first starts");
+        var second = Command("play_media", Url, Ct);
+        await Eventually.TrueAsync(() => _player.Started == 2, "the second starts");
+        await first;
+        _player.Finish();
+        await AdvanceUntilAsync(second);
+
+        _toasts.Shown.Count.ShouldBe(1);
+        _toasts.Removed.Count.ShouldBe(1);
     }
 
     [Fact]

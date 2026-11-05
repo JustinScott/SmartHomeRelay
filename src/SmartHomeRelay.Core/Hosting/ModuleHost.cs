@@ -106,7 +106,7 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         // Subscribing to every command topic (even of disabled modules) means toggling a feature never
         // needs a resubscribe; commands for disabled entities are ignored at dispatch.
         var subscriptions = new List<string> { topics.HomeAssistantStatus };
-        subscriptions.AddRange(_catalog.Entries.Where(e => e.Entity.AcceptsCommands).Select(e => topics.Command(e.Entity.Key)));
+        subscriptions.AddRange(_catalog.Entries.Where(e => e.Entity.AcceptsCommands).Select(e => topics.CommandFor(e.Entity)).Distinct(StringComparer.Ordinal));
         subscriptions.AddRange(_catalog.CustomComponents.SelectMany(c => c.Component.Commands.Select(command => topics.CustomCommand(c.Component.Name, command))));
         await _transport.SubscribeAsync(subscriptions, cancellationToken).ConfigureAwait(false);
 
@@ -308,12 +308,12 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
             return;
         }
 
-        if (!session.Topics.TryGetCommandKey(message.Topic, out var key)
-            || !_catalog.TryGet(key, out var entry)
-            || entry.Entity.CommandHandler is not { } handler)
+        if (!TryFindCommandEntry(session.Topics, message.Topic, out var entry) || entry.Entity.CommandHandler is not { } handler)
         {
             return;
         }
+
+        var key = entry.Entity.Key;
 
         if (!IsEnabled(entry.Module, CurrentValidSettings() ?? session.Settings))
         {
@@ -325,6 +325,28 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
 
         // Never run handlers inside the MQTT receive callback: a slow one would block other commands.
         RunInBackground(ct => handler(message.Payload, ct), key);
+    }
+
+    /// <summary>The entity whose command topic <paramref name="topic"/> is: its own topic, or the usual <c>{key}/set</c>.</summary>
+    private bool TryFindCommandEntry(MqttTopics topics, string topic, out CatalogEntry entry)
+    {
+        foreach (var candidate in _catalog.Entries)
+        {
+            if (candidate.Entity.CommandTopic is not null && topics.CommandFor(candidate.Entity) == topic)
+            {
+                entry = candidate;
+                return true;
+            }
+        }
+
+        // An entity with its own topic doesn't also listen on {key}/set.
+        if (topics.TryGetCommandKey(topic, out var key) && _catalog.TryGet(key, out entry) && entry.Entity.CommandTopic is null)
+        {
+            return true;
+        }
+
+        entry = null!;
+        return false;
     }
 
     private void OnCustomCommand(Session session, string componentName, string command, string payload)

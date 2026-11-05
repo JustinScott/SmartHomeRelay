@@ -38,6 +38,11 @@ public static class EntityValidator
                 errors.Add($"Entity '{entity.Key}' is a {entity.Component} and cannot have a command handler.");
             }
 
+            if (entity.CommandTopic is not null && !entity.AcceptsCommands)
+            {
+                errors.Add($"Entity '{entity.Key}' is a {entity.Component} and cannot have a command topic.");
+            }
+
             if (entity.Component == EntityComponent.Number && entity.Range is null)
             {
                 errors.Add($"Entity '{entity.Key}' is a Number but has no range.");

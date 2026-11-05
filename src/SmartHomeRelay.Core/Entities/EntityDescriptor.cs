@@ -1,3 +1,5 @@
+using SmartHomeRelay.Core.Mqtt;
+
 namespace SmartHomeRelay.Core.Entities;
 
 /// <summary>
@@ -42,9 +44,15 @@ public sealed record EntityDescriptor(string Key, string Name, EntityComponent C
     /// <summary>Required for buttons, switches, numbers, and selects; must be null otherwise.</summary>
     public EntityCommandHandler? CommandHandler { get; init; }
 
+    /// <summary>
+    /// A command topic other than the usual <c>{key}/set</c>, for a topic that is already a contract (the
+    /// notification topic, spec 5.6). Null for the usual one. Only for entities that accept commands.
+    /// </summary>
+    public Func<MqttTopics, string>? CommandTopic { get; init; }
+
     /// <summary>True for component types that receive commands from HA.</summary>
-    public bool AcceptsCommands => Component is EntityComponent.Button or EntityComponent.Switch or EntityComponent.Number or EntityComponent.Select;
+    public bool AcceptsCommands => Component is EntityComponent.Button or EntityComponent.Switch or EntityComponent.Number or EntityComponent.Select or EntityComponent.Notify;
 
     /// <summary>True for component types that have a state topic.</summary>
-    public bool HasState => Component != EntityComponent.Button;
+    public bool HasState => Component is not (EntityComponent.Button or EntityComponent.Notify);
 }

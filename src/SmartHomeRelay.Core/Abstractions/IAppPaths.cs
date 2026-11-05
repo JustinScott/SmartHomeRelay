@@ -8,4 +8,10 @@ public interface IAppPaths
 
     /// <summary>Directory for rolling log files, normally <c>%LOCALAPPDATA%\SmartHomeRelay\logs</c>.</summary>
     string LogsDirectory { get; }
+
+    /// <summary>
+    /// Directory for files the app may delete at any time (e.g. downloaded notification images), normally
+    /// <c>%LOCALAPPDATA%\SmartHomeRelay\cache</c>.
+    /// </summary>
+    string CacheDirectory { get; }
 }

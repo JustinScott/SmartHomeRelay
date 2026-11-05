@@ -18,4 +18,10 @@ public sealed class WindowsAppPaths : IAppPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         AppFolderName,
         "logs");
+
+    /// <inheritdoc />
+    public string CacheDirectory { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        AppFolderName,
+        "cache");
 }

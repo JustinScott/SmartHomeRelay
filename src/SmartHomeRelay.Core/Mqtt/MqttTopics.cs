@@ -50,6 +50,13 @@ public sealed class MqttTopics
     /// <summary><c>{baseTopic}/{deviceId}/{entityKey}/set</c>.</summary>
     public string Command(string entityKey) => $"{_deviceRoot}/{entityKey}/set";
 
+    /// <summary>The topic HA sends <paramref name="entity"/>'s commands to: its own topic, or <see cref="Command"/>.</summary>
+    public string CommandFor(EntityDescriptor entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        return entity.CommandTopic?.Invoke(this) ?? Command(entity.Key);
+    }
+
     /// <summary><c>{discoveryPrefix}/{component}/{deviceId}/{entityKey}/config</c>, retained.</summary>
     public string Discovery(EntityComponent component, string entityKey) =>
         $"{_discoveryPrefix}/{ComponentName(component)}/{DeviceId}/{entityKey}/config";
@@ -116,6 +123,7 @@ public sealed class MqttTopics
         EntityComponent.Switch => "switch",
         EntityComponent.Number => "number",
         EntityComponent.Select => "select",
+        EntityComponent.Notify => "notify",
         _ => throw new ArgumentOutOfRangeException(nameof(component), component, "Unknown component."),
     };
 }

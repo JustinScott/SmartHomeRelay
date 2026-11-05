@@ -48,7 +48,7 @@ Single primary user (the author), but built cleanly enough to run on any Windows
 | Configuration | JSON file edited through the settings window |
 | Transport | **MQTT** with HA **MQTT Discovery** |
 | Installer | **Inno Setup**, per-user install (no admin required), handles startup registration and in-place upgrades |
-| Notifications | Windows toast via `CommunityToolkit.WinUI.Notifications` (hero image supported) |
+| Notifications | Windows toast via Windows' built-in `Windows.UI.Notifications`, no package (hero image supported; decided in milestone 9) |
 | MQTT topic contract | **Existing `shr/{host}/...` layout and notification payload fields are kept**, so current HA automations keep working (confirmed) |
 | Frigate | **Removed.** HA sends image URLs directly |
 | MQTT auth | Username + password, **plain TCP (no TLS in v1)** |
@@ -174,7 +174,7 @@ Rules for modules:
 | Hosting, DI, config, logging | `Microsoft.Extensions.Hosting` (Generic Host) |
 | MQTT | `MQTTnet` v5, using the plain `IMqttClient` with our own small reconnect supervisor (the prototype's managed client is not carried over; owning the loop makes suspend/resume explicit and testable) |
 | Logging sink | `Serilog` (rolling file) via `Serilog.Extensions.Logging` |
-| Toast notifications | `CommunityToolkit.WinUI.Notifications` |
+| Toast notifications | Windows' built-in `Windows.UI.Notifications` (WinRT, no package; decided in milestone 9: the Community Toolkit library is no longer maintained, and the Windows App SDK would need its runtime on every PC or tens of MB bundled) |
 | P/Invoke | `Microsoft.Windows.CsWin32` (source-generated) |
 | Audio | Windows Core Audio (MMDevice, endpoint volume) through our own COM interop in `Platform.Windows/Interop/CoreAudio`, no package (decided in milestone 7) |
 | CPU, RAM, disk, network | `System.Diagnostics` performance counters / `System.Management` |
@@ -408,11 +408,13 @@ Reserved for a later version: a button may carry an `ActionID` instead of a `URL
 Behavior rules:
 
 - Malformed JSON or a bad field must **never throw out of the message handler**. Log and continue.
-- Image downloads use a shared `HttpClient` (via `IHttpClientFactory`), a timeout (default 10s), and a size cap (default 10 MB). Temp files are deleted after the toast is dismissed or expires, and a startup sweep removes leftovers.
+- Image downloads use the shared `Core/Net/LimitedHttpDownloader` (as in 5.9): http/https only, a timeout (default 10s), a size cap (default 10 MB), and an `image/` content type. Toasts of an unpackaged app only show local images, so the image is saved under a random name in `%LOCALAPPDATA%\SmartHomeRelay\cache\notification-images`; only PNG, JPEG and GIF are kept (anything else: the toast shows without it). Files older than the toast expiration plus an hour are swept at start and every hour, so an image stays as long as its toast can be opened from the notification center.
 - `HeroImageURL` must be a full `http` or `https` URL. Anything else (bare filenames, file paths, UNC paths) is ignored and logged, and the toast shows without an image. The prototype's local-file fallback is **removed**; the app never reads files named by an MQTT payload.
 - Toast expiration defaults to 1 day (as in the prototype).
 - Incoming notifications are placed on a small bounded queue and processed on a background worker, not inside the MQTT message handler. A slow image download must never delay other commands. If the queue is full, the oldest pending notification is dropped and the drop is logged.
-- Needs a stable App User Model ID registered by the installer (Start Menu shortcut) so toasts and activation work reliably for this unpackaged app.
+- **App identity (decided in milestone 9):** the App User Model ID is `SmartHomeRelay.App` (never change it: Windows keeps the user's notification settings under it). Until the installer exists, the app registers it itself on the first toast, under the current user (`HKCU\Software\Classes\AppUserModelId\SmartHomeRelay.App`: `DisplayName` "Smart Home Relay", `IconUri` a PNG of the app icon written to the cache folder); no admin. Uninstall removes the key (milestone 10).
+- **Clicks:** the toast body and URL buttons use protocol activation, so Windows opens the URL itself, even after the app has exited. App buttons (only the speaking notice's Stop for now) reach the app through the toast's activation event while it runs; there is no COM activator, so such a click from the notification center after the app has exited does nothing. A COM activator comes with ActionID buttons (5.7) if they are added.
+- **Notify entity (decided in milestone 9):** a `notify` entity (`notification`, "Notification") whose command topic is this same notification topic, so HA's `notify.send_message` works from automations and the UI. HA's MQTT notify sends only the message, as plain text (it drops the title), so a payload that doesn't start with `{` is shown as the message; a payload starting with `{` that isn't valid JSON is logged and ignored. The JSON fields are unchanged; titles, images and buttons still need the JSON (`mqtt.publish`, or JSON as the message).
 - **"Home Assistant is speaking" notice for the media player (5.9), added for milestone 9:** while `play_media` audio plays, a toast says so with a **Stop** button (stops the audio and undoes the duck/pause). It is **silent** (`<audio silent="true"/>`), reused (same tag/group) when a new announcement replaces the current one, and **removed from the notification center when playback ends**, so it leaves no history. With Do Not Disturb/Focus on, Windows sends it straight to the notification center, and it is still removed at the end. The text can't include the spoken message (HA only sends an audio URL). Setting `features.mediaPlayer.showNotification` (default `true`). Requested because a hidden taskbar makes a tray indicator useless. To verify on BOX1: the Stop button's activation reaches the running app without a COM activator.
 
 ### 5.7 Candidate features for later (not v1)
@@ -548,7 +550,7 @@ Notes:
     "audio":    { "enabled": true },
     "metrics":  { "enabled": true, "intervalSeconds": 30 },
     "notifications": { "enabled": true, "imageDownloadTimeoutSeconds": 10, "imageMaxBytes": 10485760 },
-    "mediaPlayer": { "enabled": false, "interruption": "duck", "duckLevelPercent": 20, "maxDownloadBytes": 20971520, "downloadTimeoutSeconds": 15, "positionIntervalSeconds": 5 },
+    "mediaPlayer": { "enabled": false, "interruption": "duck", "duckLevelPercent": 20, "maxDownloadBytes": 20971520, "downloadTimeoutSeconds": 15, "positionIntervalSeconds": 5, "showNotification": true },
     "hardware": { "enabled": false, "port": 8085, "username": "", "passwordProtected": "", "intervalSeconds": 30, "sensors": ["cpu_temperature", "cpu_fan", "ssd_temperature"], "sensorOverrides": {} }
   },
   "startWithWindows": true,
@@ -576,7 +578,7 @@ Notes:
 ## 8. Installation, Startup, and Updates
 
 - **Installer:** Inno Setup script in `installer/`. Per-user install to `%LOCALAPPDATA%\Programs\SmartHomeRelay` (no admin prompt).
-- Installer creates a Start Menu shortcut (with the App User Model ID for toast support) and, optionally, the `HKCU\...\Run` startup entry.
+- Installer creates a Start Menu shortcut (with the App User Model ID `SmartHomeRelay.App` for toast support) and, optionally, the `HKCU\...\Run` startup entry. Uninstall removes the app's `HKCU\Software\Classes\AppUserModelId\SmartHomeRelay.App` key.
 - **Publish mode:** self-contained `win-x64` only (no ARM64 or x86 builds; no .NET runtime required on the target PC). Single-file publishing is optional.
 - **Upgrades (v1):** running a newer installer upgrades in place; the app is closed first (installer uses a `CloseApplications` mechanism). Settings in `%APPDATA%` are preserved.
 - Version is defined once in `Directory.Build.props` and flows to the assembly, installer, and HA `sw_version`.
@@ -729,6 +731,7 @@ Conventions:
 - Milestone 7 decisions: Core Audio through our own COM interop instead of NAudio (nothing to pin or vet); volume as a slider; Presence ignores the Monitor on mouse nudge.
 - Media player (5.9, decided before milestone 7): the PC becomes a `media_player` through the MQTT Media Player HACS add-on (option B), chosen over a DLNA renderer (no new network listener) and a custom HA integration (too large). It mirrors the Windows media session; announcements play over it with the app ducking other apps itself; album art is deferred. New milestone 8, after Display and Audio; Notifications and the settings window move to 9 and 10.
 - Verified on BOX1 (milestone 8, add-on 2026.10.1 on HA 2026.11.0): the player mirrors the Windows media session (a browser video's title and type); play/pause, next, previous and seek work from HA; volume and mute stay in sync both ways with the Audio entities; TTS plays with `interruption` `duck` and `pause`; a second message replaces the first and the duck holds; changing the master volume during TTS works; files from the media browser play (a WAV and an MP3 from local media; video files are refused as not audio, by design); turning the feature off shows the player as Off; tests pass on BOX1 and in CI. The player is its own "BOX1 Media Player" device, listed under BOX1's connected devices (`via_device`). With the add-on patched locally (MQTT discovery topic in its manifest; `via_device` resolved as an MQTT identifier), it is discovered with no `configuration.yaml` line; both fixes go upstream as pull requests.
+- Milestone 9 decisions: toasts through Windows' built-in API (no package); the app registers its own toast identity under HKCU until the installer exists; a `notify` entity on the notification topic, with plain-text payloads shown as the message.
 - Milestone 8 decisions: custom component topics use the component name (`media_player`), not the module ID; the module has no ordinary entities; while disabled it also clears duration and position; downloads share `Core/Net/LimitedHttpDownloader`, which notifications (milestone 9) can reuse.
 - Audio additions (decided before milestone 7): `mic_muted` switch (show and change the default mic's mute) and `output_device` as a `select` to change the default output device.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
@@ -738,6 +741,7 @@ Conventions:
 **Open**
 
 - [x] MQTT Media Player add-on installed on HA for milestone 8: version 2026.10.1, reviewed (5.9).
+- [ ] Verify milestone 9 on BOX1: prototype-style JSON toasts (title, message, hero image, click URL), buttons, `notify.send_message`, toasts showing as "Smart Home Relay" with its icon, and the speaking notice: silent, Stop works while the pop-up shows, removed from the notification center when the audio ends.
 - [ ] Media player recovery (5.9): close the app, or sleep the PC, during a long announcement; the ducked apps must get their level back on the next start or wake.
 - [ ] Media player: change one app's level in Windows' volume mixer during an announcement; it must stay where the user put it after the restore (only the master volume was tested).
 - [ ] Upstream pull requests to bkbilly/mqtt_media_player: MQTT discovery without a YAML entry, and `via_device`. Once released, move the tested version and drop the `configuration.yaml` step from `docs/media-player.md`.

@@ -1,0 +1,24 @@
+{
+  "name": "Notification",
+  "unique_id": "desktop_abc123_notification",
+  "has_entity_name": true,
+  "availability_topic": "shr/DESKTOP-ABC123/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "command_topic": "shr/DESKTOP-ABC123/commands/notification",
+  "qos": 1,
+  "icon": "mdi:message-badge",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.0.0"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.0.0"
+  }
+}

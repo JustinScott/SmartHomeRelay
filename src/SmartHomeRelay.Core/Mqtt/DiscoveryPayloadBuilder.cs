@@ -62,7 +62,7 @@ public static class DiscoveryPayloadBuilder
 
             if (entity.AcceptsCommands)
             {
-                json.WriteString("command_topic", topics.Command(entity.Key));
+                json.WriteString("command_topic", topics.CommandFor(entity));
                 json.WriteNumber("qos", 1);
             }
 

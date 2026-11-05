@@ -19,7 +19,7 @@ It runs as a standard user and never asks for administrator rights.
 | Display | Monitor off, monitor on | [5.3](spec.md#53-display) |
 | Audio | Volume (slider), mute, microphone mute, output device picker | [5.4](spec.md#54-audio) |
 | Media player (optional) | A `media_player` that mirrors what Windows' media controls show, with play/pause, next, previous, seek, volume and mute, and plays text-to-speech and media from Home Assistant over your music (other apps are lowered meanwhile). Needs the [MQTT Media Player add-on](docs/media-player.md) from HACS | [5.9](spec.md#59-media-player-via-the-mqtt-media-player-add-on--milestone-8) |
-| Notifications | Planned (milestone 9) | [5.6](spec.md#56-notifications) |
+| Notifications | Windows notifications from Home Assistant: a `notify` entity for `notify.send_message`, or JSON with a title, image, click link and up to 5 buttons ([how to send them](docs/notifications.md)) | [5.6](spec.md#56-notifications) |
 
 Shutdown, restart, hibernate and sign out are off until you allow them in `settings.json`.
 
@@ -58,4 +58,5 @@ dotnet test SmartHomeRelay.sln --filter "Category=MqttBroker"
 - [AGENTS.md](AGENTS.md): rules for contributors and AI coding agents
 - [docs/hardware-sensors.md](docs/hardware-sensors.md): installing LibreHardwareMonitor for hardware sensors
 - [docs/media-player.md](docs/media-player.md): installing the MQTT Media Player add-on for the media player
+- [docs/notifications.md](docs/notifications.md): sending notifications to the PC from Home Assistant
 - `tools/probe-sensors.ps1`: lists which temperature and power sources a PC exposes to a standard user

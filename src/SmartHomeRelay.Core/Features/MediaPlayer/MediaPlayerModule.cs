@@ -29,6 +29,7 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
     private readonly IMediaSessionSource _session;
     private readonly IAudioController _audio;
     private readonly IAudioDucker _ducker;
+    private readonly IToastPresenter _toasts;
     private readonly MediaAnnouncer _announcer;
     private readonly TimeProvider _time;
     private readonly IReadOnlyList<CustomComponent> _components;
@@ -52,14 +53,16 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
         IAnnouncementPlayer player,
         IAudioDucker ducker,
         IHttpDownloader downloader,
+        IToastPresenter toasts,
         TimeProvider time)
     {
+        _toasts = toasts;
         _settings = settings;
         _session = session;
         _audio = audio;
         _ducker = ducker;
         _time = time;
-        _announcer = new MediaAnnouncer(downloader, player, ducker, session, time);
+        _announcer = new MediaAnnouncer(downloader, player, ducker, session, toasts, time);
         _components =
         [
             new CustomComponent(MediaPlayerKeys.Component, MediaPlayerKeys.DiscoveryTopic, MediaPlayerConfig.Build)
@@ -120,6 +123,7 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
         _running = running;
         _session.Changed += OnChanged;
         _audio.Changed += OnChanged;
+        _toasts.Activated += OnToastActivated;
         _loops = Task.WhenAll(SafetyLoopAsync(running.Token), PositionLoopAsync(running.Token));
     }
 
@@ -128,6 +132,7 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
     {
         _session.Changed -= OnChanged;
         _audio.Changed -= OnChanged;
+        _toasts.Activated -= OnToastActivated;
         var running = _running;
         var loops = _loops;
         _running = null;
@@ -173,6 +178,7 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
     {
         _session.Changed -= OnChanged;
         _audio.Changed -= OnChanged;
+        _toasts.Activated -= OnToastActivated;
         _running?.Cancel();
         _running?.Dispose();
         _announcer.Dispose();
@@ -362,6 +368,28 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
 
     private void OnChanged(object? sender, EventArgs e) => RequestRefresh();
 
+    /// <summary>The speaking notice's Stop button: stop the announcement and bring the other audio back.</summary>
+    private void OnToastActivated(object? sender, string arguments)
+    {
+        if (arguments != MediaAnnouncer.StopArguments || _context is not { } context)
+        {
+            return;
+        }
+
+        LogStopFromNotice(context.Logger);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _announcer.StopAsync(context.Logger, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not ObjectDisposedException)
+            {
+                Log(l => LogReadFailed(l, ex));
+            }
+        });
+    }
+
     private void RequestRefresh()
     {
         Interlocked.Exchange(ref _refreshQueued, 1);
@@ -462,6 +490,9 @@ public sealed partial class MediaPlayerModule : IFeatureModule, IHasCustomCompon
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Media player command {Command}: no media session, or it refused")]
     private static partial void LogRefused(ILogger logger, string command);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Announcement stopped from the notification")]
+    private static partial void LogStopFromNotice(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not restore volumes left lowered by an earlier announcement")]
     private static partial void LogRecoverFailed(ILogger logger, Exception exception);

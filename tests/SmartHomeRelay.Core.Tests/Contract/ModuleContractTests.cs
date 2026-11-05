@@ -31,7 +31,9 @@ public sealed class ModuleContractTests
             new SmartHomeRelay.Core.Features.Audio.AudioModule(new FakeAudioController(), TimeProvider.System),
             new HardwareModule(new FakeLhmEndpoint(), settings, new FakeSecretProtector(), new FakeUserNotifier(), TimeProvider.System),
             new SmartHomeRelay.Core.Features.MediaPlayer.MediaPlayerModule(
-                settings, new FakeMediaSession(), new FakeAudioController(), new FakeAnnouncementPlayer(), new FakeAudioDucker(), new FakeHttpDownloader(), TimeProvider.System),
+                settings, new FakeMediaSession(), new FakeAudioController(), new FakeAnnouncementPlayer(), new FakeAudioDucker(), new FakeHttpDownloader(), new FakeToastPresenter(), TimeProvider.System),
+            new SmartHomeRelay.Core.Features.Notifications.NotificationsModule(
+                settings, new FakeToastPresenter(), new FakeHttpDownloader(), new TempAppPaths(), TimeProvider.System),
         ];
     }
 

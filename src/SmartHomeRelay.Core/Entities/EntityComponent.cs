@@ -20,4 +20,7 @@ public enum EntityComponent
 
     /// <summary>One of a list of options that HA can also choose, e.g. the output device.</summary>
     Select,
+
+    /// <summary>A target for HA's notify actions; HA sends the message as the command payload.</summary>
+    Notify,
 }

@@ -12,6 +12,7 @@ using SmartHomeRelay.Core.Features.Audio;
 using SmartHomeRelay.Core.Features.Display;
 using SmartHomeRelay.Core.Features.Hardware;
 using SmartHomeRelay.Core.Features.MediaPlayer;
+using SmartHomeRelay.Core.Features.Notifications;
 using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
@@ -25,6 +26,7 @@ using SmartHomeRelay.Platform.Windows.Hardware;
 using SmartHomeRelay.Platform.Windows.Hosting;
 using SmartHomeRelay.Platform.Windows.Media;
 using SmartHomeRelay.Platform.Windows.Metrics;
+using SmartHomeRelay.Platform.Windows.Notifications;
 using SmartHomeRelay.Platform.Windows.Power;
 using SmartHomeRelay.Platform.Windows.Presence;
 
@@ -94,11 +96,16 @@ internal static class Program
         builder.Services.AddSingleton<ILibreHardwareMonitorEndpoint, WindowsLibreHardwareMonitorEndpoint>();
         builder.Services.AddSingleton<IFeatureModule, HardwareModule>();
 
+        // Toasts (spec 5.6), shared by Notifications and the media player's speaking notice
+        builder.Services.AddSingleton(new ToastAppIdentity(ToastAppIdentity.DefaultAppUserModelId, "Smart Home Relay", ToastIconFile.Write(paths.CacheDirectory)));
+        builder.Services.AddSingleton<IToastPresenter, WindowsToastPresenter>();
+        builder.Services.AddSingleton<IHttpDownloader, LimitedHttpDownloader>();
+        builder.Services.AddSingleton<IFeatureModule, NotificationsModule>();
+
         // Media player through the MQTT Media Player add-on (spec 5.9); volume and mute reuse IAudioController
         builder.Services.AddSingleton<IMediaSessionSource, WindowsMediaSessionSource>();
         builder.Services.AddSingleton<IAnnouncementPlayer, WindowsAnnouncementPlayer>();
         builder.Services.AddSingleton<IAudioDucker, WindowsAudioDucker>();
-        builder.Services.AddSingleton<IHttpDownloader, LimitedHttpDownloader>();
         builder.Services.AddSingleton<IFeatureModule, MediaPlayerModule>();
 
         using var host = builder.Build();

@@ -35,4 +35,7 @@ public sealed class MediaPlayerSettings : FeatureToggle
 
     /// <summary>How often the playback position is published while playing.</summary>
     public int PositionIntervalSeconds { get; set; } = 5;
+
+    /// <summary>Show a silent "Home Assistant is speaking" toast with a Stop button while HA's audio plays (spec 5.6).</summary>
+    public bool ShowNotification { get; set; } = true;
 }

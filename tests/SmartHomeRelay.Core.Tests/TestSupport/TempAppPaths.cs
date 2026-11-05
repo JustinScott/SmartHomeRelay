@@ -10,6 +10,7 @@ internal sealed class TempAppPaths : IAppPaths, IDisposable
         Root = Path.Combine(Path.GetTempPath(), "shr-tests", Guid.NewGuid().ToString("N"));
         SettingsFilePath = Path.Combine(Root, "config", "settings.json");
         LogsDirectory = Path.Combine(Root, "logs");
+        CacheDirectory = Path.Combine(Root, "cache");
     }
 
     public string Root { get; }
@@ -17,6 +18,8 @@ internal sealed class TempAppPaths : IAppPaths, IDisposable
     public string SettingsFilePath { get; }
 
     public string LogsDirectory { get; }
+
+    public string CacheDirectory { get; }
 
     public void WriteSettingsFile(string contents)
     {

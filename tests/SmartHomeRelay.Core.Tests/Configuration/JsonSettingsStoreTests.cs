@@ -62,7 +62,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         root.GetProperty("features").GetProperty("hardware").GetProperty("sensors").EnumerateArray().Select(e => e.GetString())
             .ShouldBe(["cpu_temperature", "cpu_fan", "ssd_temperature"]);
         PropertyNames(root.GetProperty("features").GetProperty("mediaPlayer")).ShouldBe(
-            ["enabled", "interruption", "duckLevelPercent", "maxDownloadBytes", "downloadTimeoutSeconds", "positionIntervalSeconds"],
+            ["enabled", "interruption", "duckLevelPercent", "maxDownloadBytes", "downloadTimeoutSeconds", "positionIntervalSeconds", "showNotification"],
             ignoreOrder: false);
         root.GetProperty("logLevel").GetString().ShouldBe("Information");
     }

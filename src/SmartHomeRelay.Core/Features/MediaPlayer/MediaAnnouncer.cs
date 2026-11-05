@@ -3,13 +3,15 @@ using Microsoft.Extensions.Logging;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Net;
+using SmartHomeRelay.Core.Toasts;
 
 namespace SmartHomeRelay.Core.Features.MediaPlayer;
 
 /// <summary>
 /// Plays what HA sends to <c>play_media</c> (spec 5.9): checks and downloads the URL, interrupts other audio
 /// (duck or pause), plays, and undoes the interruption <see cref="RestoreDelay"/> after the last announcement.
-/// One at a time: a new announcement stops the one playing and keeps the interruption.
+/// One at a time: a new announcement stops the one playing and keeps the interruption. While it plays, a silent
+/// "Home Assistant is speaking" toast with a Stop button can be shown (spec 5.6); it is removed with the interruption.
 /// </summary>
 public sealed partial class MediaAnnouncer : IDisposable
 {
@@ -19,19 +21,45 @@ public sealed partial class MediaAnnouncer : IDisposable
     /// <summary>Only audio is played.</summary>
     public const string AcceptedTypePrefix = "audio/";
 
+    /// <summary>The arguments of the speaking notice's Stop button.</summary>
+    public const string StopArguments = "shr:media_player:stop";
+
+    /// <summary>Tag of the speaking notice; a new announcement replaces it rather than adding another.</summary>
+    public const string NoticeTag = "speaking";
+
+    /// <summary>Group of the speaking notice.</summary>
+    public const string NoticeGroup = "media_player";
+
+    /// <summary>The speaking notice.</summary>
+    public static readonly ToastContent Notice = new()
+    {
+        Title = "Home Assistant is speaking",
+        Buttons = [new ToastButton("Stop", StopArguments, OpensUrl: false)],
+        Silent = true,
+        LongDuration = true,
+        Tag = NoticeTag,
+        Group = NoticeGroup,
+
+        // Removed when playback ends; this only matters if the app stops before it can remove it.
+        Expiration = TimeSpan.FromMinutes(30),
+    };
+
     private readonly IHttpDownloader _downloader;
     private readonly IAnnouncementPlayer _player;
     private readonly IAudioDucker _ducker;
     private readonly IMediaSessionSource _session;
     private readonly TimeProvider _time;
+    private readonly IToastPresenter _toasts;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CancellationTokenSource? _current;
     private long _generation;
     private Interruption _interruption;
+    private bool _noticeShown;
 
     /// <summary>Creates the announcer.</summary>
-    public MediaAnnouncer(IHttpDownloader downloader, IAnnouncementPlayer player, IAudioDucker ducker, IMediaSessionSource session, TimeProvider time)
+    public MediaAnnouncer(IHttpDownloader downloader, IAnnouncementPlayer player, IAudioDucker ducker, IMediaSessionSource session, IToastPresenter toasts, TimeProvider time)
     {
+        _toasts = toasts;
         _downloader = downloader;
         _player = player;
         _ducker = ducker;
@@ -118,6 +146,11 @@ public sealed partial class MediaAnnouncer : IDisposable
                     await BeginInterruptionAsync(settings, logger, mine.Token).ConfigureAwait(false);
                 }
 
+                if (settings.ShowNotification && !_noticeShown)
+                {
+                    await ShowNoticeAsync(logger, mine.Token).ConfigureAwait(false);
+                }
+
                 LogPlaying(logger, host, file.Content.Length);
                 await _player.PlayAsync(file.Content, file.ContentType, mine.Token).ConfigureAwait(false);
             }
@@ -174,6 +207,31 @@ public sealed partial class MediaAnnouncer : IDisposable
         }
     }
 
+    private async Task ShowNoticeAsync(ILogger logger, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _toasts.ShowAsync(Notice, cancellationToken).ConfigureAwait(false);
+            _noticeShown = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogNoticeFailed(logger, ex);
+        }
+    }
+
+    private async Task RemoveNoticeAsync(ILogger logger, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _toasts.RemoveAsync(NoticeTag, NoticeGroup, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogNoticeFailed(logger, ex);
+        }
+    }
+
     private async Task BeginInterruptionAsync(MediaPlayerSettings settings, ILogger logger, CancellationToken cancellationToken)
     {
         try
@@ -207,6 +265,12 @@ public sealed partial class MediaAnnouncer : IDisposable
             if (Interlocked.Read(ref _generation) != generation)
             {
                 return;
+            }
+
+            if (_noticeShown)
+            {
+                _noticeShown = false;
+                await RemoveNoticeAsync(logger, cancellationToken).ConfigureAwait(false);
             }
 
             var interruption = _interruption;
@@ -247,6 +311,9 @@ public sealed partial class MediaAnnouncer : IDisposable
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not lower or pause other audio; playing anyway")]
     private static partial void LogInterruptFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not show or remove the speaking notification")]
+    private static partial void LogNoticeFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not bring other audio back")]
     private static partial void LogRestoreFailed(ILogger logger, Exception exception);
