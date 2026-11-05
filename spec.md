@@ -728,6 +728,7 @@ Conventions:
 - Verified on BOX1 (milestone 7 complete): Monitor off/on, volume slider, mute, microphone mute, and output device switching work from HA, and Windows-side changes show up in HA; Windows tests pass on BOX1 and in CI (run #11).
 - Milestone 7 decisions: Core Audio through our own COM interop instead of NAudio (nothing to pin or vet); volume as a slider; Presence ignores the Monitor on mouse nudge.
 - Media player (5.9, decided before milestone 7): the PC becomes a `media_player` through the MQTT Media Player HACS add-on (option B), chosen over a DLNA renderer (no new network listener) and a custom HA integration (too large). It mirrors the Windows media session; announcements play over it with the app ducking other apps itself; album art is deferred. New milestone 8, after Display and Audio; Notifications and the settings window move to 9 and 10.
+- Verified on BOX1 (milestone 8, add-on 2026.10.1 on HA 2026.11.0): the player mirrors the Windows media session (a browser video's title and type); play/pause, next, previous and seek work from HA; volume and mute stay in sync both ways with the Audio entities; TTS plays with `interruption` `duck` and `pause`; a second message replaces the first and the duck holds; changing the master volume during TTS works. The player is its own "BOX1 Media Player" device, listed under BOX1's connected devices (`via_device`). With the add-on patched locally (MQTT discovery topic in its manifest; `via_device` resolved as an MQTT identifier), it is discovered with no `configuration.yaml` line; both fixes go upstream as pull requests.
 - Milestone 8 decisions: custom component topics use the component name (`media_player`), not the module ID; the module has no ordinary entities; while disabled it also clears duration and position; downloads share `Core/Net/LimitedHttpDownloader`, which notifications (milestone 9) can reuse.
 - Audio additions (decided before milestone 7): `mic_muted` switch (show and change the default mic's mute) and `output_device` as a `select` to change the default output device.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).
@@ -737,7 +738,9 @@ Conventions:
 **Open**
 
 - [x] MQTT Media Player add-on installed on HA for milestone 8: version 2026.10.1, reviewed (5.9).
-- [ ] Verify milestone 8 on BOX1 with add-on 2026.10.1: the player appears as its own "BOX1 Media Player" device, mirrors Spotify and a browser, transport/seek/volume/mute work, TTS plays with ducking (and with `interruption: "pause"`), and turning the feature off shows Off.
+- [ ] Media player recovery (5.9): close the app, or sleep the PC, during a long announcement; the ducked apps must get their level back on the next start or wake.
+- [ ] Media player: change one app's level in Windows' volume mixer during an announcement; it must stay where the user put it after the restore (only the master volume was tested).
+- [ ] Upstream pull requests to bkbilly/mqtt_media_player: MQTT discovery without a YAML entry, and `via_device`. Once released, move the tested version and drop the `configuration.yaml` step from `docs/media-player.md`.
 - [ ] Check whether Monitor on wakes the display while the PC is locked (5.3); the mouse nudge may not count as input on the lock screen.
 - [ ] Tray item "Pause/Resume reporting" (7.1) is not assigned to a milestone yet. It can reuse the suspend/resume path from milestone 3.
 - [ ] Rotate the MQTT password if the prototype source (with its hardcoded credentials) was ever committed or shared.
