@@ -413,6 +413,7 @@ Behavior rules:
 - Toast expiration defaults to 1 day (as in the prototype).
 - Incoming notifications are placed on a small bounded queue and processed on a background worker, not inside the MQTT message handler. A slow image download must never delay other commands. If the queue is full, the oldest pending notification is dropped and the drop is logged.
 - Needs a stable App User Model ID registered by the installer (Start Menu shortcut) so toasts and activation work reliably for this unpackaged app.
+- **"Home Assistant is speaking" notice for the media player (5.9), added for milestone 9:** while `play_media` audio plays, a toast says so with a **Stop** button (stops the audio and undoes the duck/pause). It is **silent** (`<audio silent="true"/>`), reused (same tag/group) when a new announcement replaces the current one, and **removed from the notification center when playback ends**, so it leaves no history. With Do Not Disturb/Focus on, Windows sends it straight to the notification center, and it is still removed at the end. The text can't include the spoken message (HA only sends an audio URL). Setting `features.mediaPlayer.showNotification` (default `true`). Requested because a hidden taskbar makes a tray indicator useless. To verify on BOX1: the Stop button's activation reaches the running app without a COM activator.
 
 ### 5.7 Candidate features for later (not v1)
 
@@ -687,7 +688,7 @@ Conventions:
 6. **Metrics** module, plus hardware sensors from a user-managed LibreHardwareMonitor (5.8).
 7. **Display** and **Audio** modules (including `mic_muted` and the `output_device` select).
 8. **Media player** via the MQTT Media Player add-on (5.9), with custom discovery (3.3) and ducking.
-9. **Notifications** module.
+9. **Notifications** module, including the media player's "Home Assistant is speaking" notice (5.6).
 10. **Settings window** polish and installer.
 
 ---
