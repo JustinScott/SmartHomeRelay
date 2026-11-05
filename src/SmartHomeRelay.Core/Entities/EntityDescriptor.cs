@@ -24,11 +24,14 @@ public sealed record EntityDescriptor(string Key, string Name, EntityComponent C
     /// <summary>Where HA shows the entity; null for a primary entity.</summary>
     public EntityCategory? Category { get; init; }
 
-    /// <summary>Allowed values for an enum sensor (device class <c>enum</c>).</summary>
+    /// <summary>Allowed values for an enum sensor (device class <c>enum</c>) or a <see cref="EntityComponent.Select"/>.</summary>
     public IReadOnlyList<string>? Options { get; init; }
 
     /// <summary>Range for a <see cref="EntityComponent.Number"/>. Required for numbers.</summary>
     public NumberRange? Range { get; init; }
+
+    /// <summary>How HA shows a <see cref="EntityComponent.Number"/>; null lets HA decide.</summary>
+    public NumberMode? Mode { get; init; }
 
     /// <summary>Optional extra availability condition; null means available whenever the device is online.</summary>
     public EntityAvailability? AvailableWhen { get; init; }
@@ -36,11 +39,11 @@ public sealed record EntityDescriptor(string Key, string Name, EntityComponent C
     /// <summary>Whether state messages are retained (sensors yes; spec 4.3).</summary>
     public bool RetainState { get; init; } = true;
 
-    /// <summary>Required for buttons, switches, and numbers; must be null otherwise.</summary>
+    /// <summary>Required for buttons, switches, numbers, and selects; must be null otherwise.</summary>
     public EntityCommandHandler? CommandHandler { get; init; }
 
     /// <summary>True for component types that receive commands from HA.</summary>
-    public bool AcceptsCommands => Component is EntityComponent.Button or EntityComponent.Switch or EntityComponent.Number;
+    public bool AcceptsCommands => Component is EntityComponent.Button or EntityComponent.Switch or EntityComponent.Number or EntityComponent.Select;
 
     /// <summary>True for component types that have a state topic.</summary>
     public bool HasState => Component != EntityComponent.Button;

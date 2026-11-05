@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using SmartHomeRelay.Core.Entities;
 using SmartHomeRelay.Core.Features;
 
 namespace SmartHomeRelay.Core.Tests.TestSupport;
@@ -15,6 +16,14 @@ internal sealed class RecordingModuleContext : IModuleContext
     public Task PublishStateAsync(string entityKey, string payload, CancellationToken cancellationToken)
     {
         Published.Enqueue((entityKey, payload));
+        return Task.CompletedTask;
+    }
+
+    public ConcurrentQueue<EntityDescriptor> Updates { get; } = new();
+
+    public Task UpdateEntityAsync(EntityDescriptor entity, CancellationToken cancellationToken)
+    {
+        Updates.Enqueue(entity);
         return Task.CompletedTask;
     }
 

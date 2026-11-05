@@ -27,6 +27,8 @@ public sealed class ModuleContractTests
             new PresenceModule(new FakeSystemEventSource(), sources, sources, settings, TimeProvider.System),
             new PowerModule(power, power, settings, TimeProvider.System),
             new MetricsModule(new FakeMetricsSource(), settings, TimeProvider.System),
+            new SmartHomeRelay.Core.Features.Display.DisplayModule(new FakeDisplayController()),
+            new SmartHomeRelay.Core.Features.Audio.AudioModule(new FakeAudioController(), TimeProvider.System),
             new HardwareModule(new FakeLhmEndpoint(), settings, new FakeSecretProtector(), new FakeUserNotifier(), TimeProvider.System),
         ];
     }

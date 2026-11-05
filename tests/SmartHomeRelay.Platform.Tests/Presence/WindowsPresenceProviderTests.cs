@@ -1,3 +1,4 @@
+using SmartHomeRelay.Platform.Windows.Input;
 using SmartHomeRelay.Platform.Windows.Presence;
 
 namespace SmartHomeRelay.Platform.Tests.Presence;
@@ -9,7 +10,7 @@ public sealed class WindowsPresenceProviderTests
     [Fact]
     public void GetIdleTime_ReturnsNonNegativeTime()
     {
-        new WindowsIdleTimeProvider().GetIdleTime().ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
+        new WindowsIdleTimeProvider(new SyntheticInputTracker()).GetIdleTime().ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
     }
 
     [Fact]
@@ -17,7 +18,7 @@ public sealed class WindowsPresenceProviderTests
     {
         var sinceBoot = TimeSpan.FromMilliseconds(Environment.TickCount64);
 
-        new WindowsIdleTimeProvider().GetIdleTime().ShouldBeLessThanOrEqualTo(sinceBoot);
+        new WindowsIdleTimeProvider(new SyntheticInputTracker()).GetIdleTime().ShouldBeLessThanOrEqualTo(sinceBoot);
     }
 
     [Theory]

@@ -34,6 +34,7 @@ public sealed class MqttTopicsTests
     [InlineData(EntityComponent.Button, "homeassistant/button/DESKTOP-ABC123/cpu_usage/config")]
     [InlineData(EntityComponent.Switch, "homeassistant/switch/DESKTOP-ABC123/cpu_usage/config")]
     [InlineData(EntityComponent.Number, "homeassistant/number/DESKTOP-ABC123/cpu_usage/config")]
+    [InlineData(EntityComponent.Select, "homeassistant/select/DESKTOP-ABC123/cpu_usage/config")]
     public void Discovery_UsesComponentAndDeviceId(EntityComponent component, string expected)
     {
         _topics.Discovery(component, "cpu_usage").ShouldBe(expected);

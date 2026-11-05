@@ -1,0 +1,28 @@
+{
+  "name": "Output device",
+  "unique_id": "desktop_abc123_output_device",
+  "has_entity_name": true,
+  "availability_topic": "shr/DESKTOP-ABC123/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "state_topic": "shr/DESKTOP-ABC123/output_device/state",
+  "command_topic": "shr/DESKTOP-ABC123/output_device/set",
+  "qos": 1,
+  "options": [
+    "Speakers (Realtek(R) Audio)",
+    "Headphones (USB Audio)"
+  ],
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

@@ -17,4 +17,7 @@ public enum EntityComponent
 
     /// <summary>A numeric value that HA can also set, e.g. volume.</summary>
     Number,
+
+    /// <summary>One of a list of options that HA can also choose, e.g. the output device.</summary>
+    Select,
 }

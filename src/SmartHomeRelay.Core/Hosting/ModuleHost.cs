@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SmartHomeRelay.Core.Configuration;
+using SmartHomeRelay.Core.Entities;
 using SmartHomeRelay.Core.Features;
 using SmartHomeRelay.Core.Mqtt;
 
@@ -144,6 +145,32 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogStatePublishFailed(_logger, ex, entityKey);
+        }
+    }
+
+    internal async Task UpdateEntityAsync(IFeatureModule module, EntityDescriptor entity, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        if (_catalog.TryReplace(module, entity) is { } problem)
+        {
+            LogEntityUpdateRejected(_logger, module.Id, problem);
+            return;
+        }
+
+        var session = Volatile.Read(ref _session);
+        if (session is null || !_transport.IsConnected || !IsEnabled(module, CurrentValidSettings() ?? session.Settings))
+        {
+            return; // Published with the rest on the next connect.
+        }
+
+        try
+        {
+            var payload = DiscoveryPayloadBuilder.Build(entity, session.Topics, session.Settings.Device, RelayVersion.Current);
+            await _transport.PublishAsync(session.Topics.Discovery(entity.Component, entity.Key), payload, MqttQos.AtLeastOnce, retain: true, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            LogStatePublishFailed(_logger, ex, entity.Key);
         }
     }
 
@@ -434,6 +461,9 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Module {ModuleId} failed to handle {Transition}; other modules are unaffected")]
     private static partial void LogPowerTransitionFailed(ILogger logger, Exception exception, string moduleId, string transition);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Module {ModuleId} tried an invalid entity update; kept the previous one: {Problem}")]
+    private static partial void LogEntityUpdateRejected(ILogger logger, string moduleId, string problem);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Background work failed")]
     private static partial void LogBackgroundWorkFailed(ILogger logger, Exception exception);

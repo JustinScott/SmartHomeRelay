@@ -108,4 +108,24 @@ public sealed class EntityValidatorTests
 
         EntityValidator.Validate(entities).ShouldNotBeEmpty();
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("A|A")]
+    [InlineData("A| ")]
+    public void Validate_SelectWithBadOptions_ReturnsError(string options)
+    {
+        string[] list = options.Length == 0 ? [] : options.Split('|');
+        EntityDescriptor[] entities = [new("output_device", "Output", EntityComponent.Select) { CommandHandler = s_noop, Options = list }];
+
+        EntityValidator.Validate(entities).ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void Validate_SelectWithoutHandler_ReturnsError()
+    {
+        EntityDescriptor[] entities = [new("output_device", "Output", EntityComponent.Select) { Options = ["A"] }];
+
+        EntityValidator.Validate(entities).ShouldNotBeEmpty();
+    }
 }

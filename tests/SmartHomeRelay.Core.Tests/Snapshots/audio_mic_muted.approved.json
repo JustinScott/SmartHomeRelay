@@ -1,0 +1,29 @@
+{
+  "name": "Microphone muted",
+  "unique_id": "desktop_abc123_mic_muted",
+  "has_entity_name": true,
+  "availability_topic": "shr/DESKTOP-ABC123/status",
+  "payload_available": "online",
+  "payload_not_available": "offline",
+  "state_topic": "shr/DESKTOP-ABC123/mic_muted/state",
+  "command_topic": "shr/DESKTOP-ABC123/mic_muted/set",
+  "qos": 1,
+  "payload_on": "ON",
+  "payload_off": "OFF",
+  "state_on": "ON",
+  "state_off": "OFF",
+  "icon": "mdi:microphone-off",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

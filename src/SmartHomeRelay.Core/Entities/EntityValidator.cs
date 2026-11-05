@@ -43,6 +43,11 @@ public static class EntityValidator
                 errors.Add($"Entity '{entity.Key}' is a Number but has no range.");
             }
 
+            if (entity.Component == EntityComponent.Select && (entity.Options is not { Count: > 0 } options || options.Distinct(StringComparer.Ordinal).Count() != options.Count || options.Any(string.IsNullOrWhiteSpace)))
+            {
+                errors.Add($"Entity '{entity.Key}' is a Select but has no options, duplicate options, or a blank option.");
+            }
+
             if (entity.Range is { } range && (range.Min >= range.Max || range.Step <= 0))
             {
                 errors.Add($"Entity '{entity.Key}' has an invalid range.");

@@ -16,7 +16,9 @@ It runs as a standard user and never asks for administrator rights.
 | Power | Shutdown, restart, cancel shutdown, sleep, hibernate, lock, sign out; last boot, uptime | [5.2](spec.md#52-power) |
 | Metrics | CPU, memory, disk, network, GPU usage; CPU power; GPU temperature and power level | [5.5](spec.md#55-system-metrics) |
 | Hardware sensors (optional) | CPU temperature, CPU fan, SSD temperature, from a [LibreHardwareMonitor you install](docs/hardware-sensors.md) | [5.8](spec.md#58-hardware-sensors-librehardwaremonitor--milestone-6) |
-| Display, Audio, Media player, Notifications | Planned (milestones 7, 8 and 9). The media player needs the [MQTT Media Player](https://github.com/bkbilly/mqtt_media_player) add-on from HACS | [5.3](spec.md#53-display), [5.4](spec.md#54-audio), [5.9](spec.md#59-media-player-via-the-mqtt-media-player-add-on--milestone-8), [5.6](spec.md#56-notifications) |
+| Display | Monitor off, monitor on | [5.3](spec.md#53-display) |
+| Audio | Volume (slider), mute, microphone mute, output device picker | [5.4](spec.md#54-audio) |
+| Media player, Notifications | Planned (milestones 8 and 9). The media player needs the [MQTT Media Player](https://github.com/bkbilly/mqtt_media_player) add-on from HACS | [5.9](spec.md#59-media-player-via-the-mqtt-media-player-add-on--milestone-8), [5.6](spec.md#56-notifications) |
 
 Shutdown, restart, hibernate and sign out are off until you allow them in `settings.json`.
 

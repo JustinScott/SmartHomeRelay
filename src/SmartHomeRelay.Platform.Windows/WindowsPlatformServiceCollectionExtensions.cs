@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Platform.Windows.Configuration;
 using SmartHomeRelay.Platform.Windows.Hosting;
+using SmartHomeRelay.Platform.Windows.Input;
 using SmartHomeRelay.Platform.Windows.Lifecycle;
 
 namespace SmartHomeRelay.Platform.Windows;
@@ -27,6 +28,7 @@ public static class WindowsPlatformServiceCollectionExtensions
         services.AddSingleton<ISecretProtector, DpapiSecretProtector>();
         services.AddSingleton<IShellLauncher, ShellLauncher>();
         services.AddSingleton<ISystemEventSource, WindowsSystemEventSource>();
+        services.AddSingleton<SyntheticInputTracker>();
         return services;
     }
 }

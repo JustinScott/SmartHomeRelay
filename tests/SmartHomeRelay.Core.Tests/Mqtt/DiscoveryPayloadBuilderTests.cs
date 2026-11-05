@@ -110,6 +110,37 @@ public sealed class DiscoveryPayloadBuilderTests
         }),
         "number");
 
+    [Fact]
+    public void Snapshot_NumberSlider() => Snapshot.ShouldMatchApproved(
+        Build(new EntityDescriptor("volume", "Volume", EntityComponent.Number)
+        {
+            CommandHandler = s_noop,
+            Range = new NumberRange(0, 100, 1),
+            Mode = NumberMode.Slider,
+            UnitOfMeasurement = "%",
+        }),
+        "number_slider");
+
+    [Fact]
+    public void Snapshot_Select() => Snapshot.ShouldMatchApproved(
+        Build(new EntityDescriptor("output_device", "Output device", EntityComponent.Select)
+        {
+            CommandHandler = s_noop,
+            Options = ["Speakers (Realtek(R) Audio)", "Headphones (USB Audio)"],
+        }),
+        "select");
+
+    [Fact]
+    public void Build_Select_HasStateCommandAndOptions()
+    {
+        using var json = Parse(Build(new EntityDescriptor("output_device", "Output device", EntityComponent.Select) { CommandHandler = s_noop, Options = ["A", "B"] }));
+        var root = json.RootElement;
+
+        root.GetProperty("state_topic").GetString().ShouldBe("shr/DESKTOP-ABC123/output_device/state");
+        root.GetProperty("command_topic").GetString().ShouldBe("shr/DESKTOP-ABC123/output_device/set");
+        root.GetProperty("options").EnumerateArray().Select(e => e.GetString()).ShouldBe(["A", "B"]);
+    }
+
     private static string Build(EntityDescriptor entity)
     {
         var settings = FakeSettingsState.Configured();

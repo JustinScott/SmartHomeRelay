@@ -130,6 +130,11 @@ public static class DiscoveryPayloadBuilder
                 json.WriteNumber("min", range.Min);
                 json.WriteNumber("max", range.Max);
                 json.WriteNumber("step", range.Step);
+                if (entity.Mode is { } mode)
+                {
+                    json.WriteString("mode", mode == NumberMode.Slider ? "slider" : "box");
+                }
+
                 break;
             default:
                 break;

@@ -10,7 +10,8 @@ namespace SmartHomeRelay.Core.Hosting;
 /// </summary>
 public sealed class EntityCatalog
 {
-    private readonly Dictionary<string, CatalogEntry> _byKey;
+    private readonly Lock _replaceGate = new();
+    private Dictionary<string, CatalogEntry> _byKey;
 
     private EntityCatalog(IReadOnlyList<IFeatureModule> modules, Dictionary<string, CatalogEntry> byKey, IReadOnlyList<string> rejections)
     {
@@ -22,8 +23,8 @@ public sealed class EntityCatalog
     /// <summary>Modules that passed validation, in registration order.</summary>
     public IReadOnlyList<IFeatureModule> Modules { get; }
 
-    /// <summary>All accepted entities.</summary>
-    public IEnumerable<CatalogEntry> Entries => _byKey.Values;
+    /// <summary>All accepted entities, in registration order.</summary>
+    public IEnumerable<CatalogEntry> Entries => Volatile.Read(ref _byKey).Values;
 
     /// <summary>Why modules were rejected; empty when all are valid.</summary>
     public IReadOnlyList<string> Rejections { get; }
@@ -79,5 +80,40 @@ public sealed class EntityCatalog
     }
 
     /// <summary>Finds the entity with <paramref name="key"/>.</summary>
-    public bool TryGet(string key, out CatalogEntry entry) => _byKey.TryGetValue(key, out entry!);
+    public bool TryGet(string key, out CatalogEntry entry) => Volatile.Read(ref _byKey).TryGetValue(key, out entry!);
+
+    /// <summary>
+    /// Replaces one entity's description (spec 3.3: a select's options can change while the app runs).
+    /// It must belong to <paramref name="module"/>, keep its key and component, and pass validation together
+    /// with the module's other entities. Returns the problem, or null when replaced.
+    /// </summary>
+    internal string? TryReplace(IFeatureModule module, EntityDescriptor entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        lock (_replaceGate)
+        {
+            var current = Volatile.Read(ref _byKey);
+            if (!current.TryGetValue(entity.Key, out var existing) || existing.Module != module)
+            {
+                return $"Entity '{entity.Key}' does not belong to module '{module.Id}'.";
+            }
+
+            if (existing.Entity.Component != entity.Component)
+            {
+                return $"Entity '{entity.Key}' cannot change from {existing.Entity.Component} to {entity.Component}.";
+            }
+
+            var siblings = current.Values.Where(e => e.Module == module).Select(e => e.Entity.Key == entity.Key ? entity : e.Entity).ToList();
+            var errors = EntityValidator.Validate(siblings);
+            if (errors.Count > 0)
+            {
+                return string.Join(" ", errors);
+            }
+
+            // Copy-on-write keeps readers lock-free and the order unchanged.
+            var updated = new Dictionary<string, CatalogEntry>(current, StringComparer.Ordinal) { [entity.Key] = existing with { Entity = entity } };
+            Volatile.Write(ref _byKey, updated);
+            return null;
+        }
+    }
 }

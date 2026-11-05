@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SmartHomeRelay.Core.Entities;
 using SmartHomeRelay.Core.Features;
 
 namespace SmartHomeRelay.Core.Hosting;
@@ -10,4 +11,7 @@ internal sealed class ModuleContext(ModuleHost host, IFeatureModule module, ILog
 
     public Task PublishStateAsync(string entityKey, string payload, CancellationToken cancellationToken) =>
         host.PublishStateAsync(module, entityKey, payload, cancellationToken);
+
+    public Task UpdateEntityAsync(EntityDescriptor entity, CancellationToken cancellationToken) =>
+        host.UpdateEntityAsync(module, entity, cancellationToken);
 }

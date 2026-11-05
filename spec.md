@@ -157,6 +157,7 @@ Behavior of the host (`Core/Hosting/ModuleHost`), implemented in milestone 2:
 - `PublishStateAsync` can be called at any time, including while disconnected. The host keeps the latest value per entity and publishes all of them after every (re)connect and when HA restarts, so modules never track the connection.
 - Commands run on background tasks, never inside the MQTT receive callback, so a slow handler never delays other commands. Commands for a disabled module's entities are ignored.
 - A module whose entities break the rules (invalid or duplicate key, command entity without a handler, number without a range) is rejected as a whole and logged; the others run normally.
+- **Updating an entity while running (milestone 7):** `IModuleContext.UpdateEntityAsync` replaces one of the module's own entity descriptions (same key and component, revalidated with its siblings) and republishes its discovery config; an invalid update is rejected and logged. Used for the `output_device` select's options.
 - **Custom discovery (planned, milestone 8, for 5.9):** a module may also describe a *custom component* that the standard entity types can't express (the `media_player` from the MQTT Media Player add-on). It supplies the discovery config and its own state and command topics, all under `{baseTopic}/{deviceId}/{module id}/…`. The host publishes, retains, republishes and clears that config like any other discovery, routes the module's command topics to it, and keeps the latest value per state topic for republishing. The `device` block is the same as for every other entity, so it lands on the same HA device.
 
 Rules for modules:
@@ -175,7 +176,7 @@ Rules for modules:
 | Logging sink | `Serilog` (rolling file) via `Serilog.Extensions.Logging` |
 | Toast notifications | `CommunityToolkit.WinUI.Notifications` |
 | P/Invoke | `Microsoft.Windows.CsWin32` (source-generated) |
-| Audio | `NAudio` (WASAPI / MMDevice) |
+| Audio | Windows Core Audio (MMDevice, endpoint volume) through our own COM interop in `Platform.Windows/Interop/CoreAudio`, no package (decided in milestone 7) |
 | CPU, RAM, disk, network | `System.Diagnostics` performance counters / `System.Management` |
 | GPU usage | Windows `GPU Engine` performance counters (no admin required) |
 | Tests | `xunit`, `NSubstitute`, `Shouldly` (or plain xUnit asserts) |
@@ -316,6 +317,11 @@ Implementation details (milestone 5):
 
 - Windows cannot reliably report whether the monitor is currently on, so **no monitor-state sensor** in v1.
 - Brightness control is **out of scope for v1** (see 5.7).
+- Implementation details (milestone 7):
+  - **Off** broadcasts `WM_SYSCOMMAND`/`SC_MONITORPOWER` (2) with `SendMessageTimeout` (`SMTO_ABORTIFHUNG`, 2 s), so a hung window can't block it.
+  - **On** nudges the mouse one pixel and back with `SendInput` and sets `ES_DISPLAY_REQUIRED`. On the lock screen the nudge may not count as input; the display wakes there through the execution state where the driver honors it.
+  - **Presence ignores the nudge (decided):** a shared `SyntheticInputTracker` (Platform) records the last real input before the nudge and the nudge's own input tick. Until the user provides newer input, idle time is measured from the real input, so pressing Monitor on never makes Presence report "active". During the ~200 ms the nudge takes, idle time is also measured from the real input, so real input in that window is briefly ignored too.
+  - Buttons accept only `PRESS`, like Power.
 
 ### 5.4 Audio
 
@@ -329,6 +335,11 @@ Implementation details (milestone 5):
 - Must handle default-device changes at runtime (headphones plugged in, etc.) via MMDevice notifications, and update `output_device`'s options when devices are added or removed.
 - `mic_muted` both shows and changes whether the default microphone is muted (decided before milestone 7).
 - Needs a new entity type, `select` (HA MQTT `select`: `options`, `state_topic`, `command_topic`), added to the shared entity abstractions with snapshot tests.
+- Implementation details (milestone 7):
+  - **No package (decided):** our own COM interop for Core Audio (`IMMDeviceEnumerator`, `IAudioEndpointVolume`, `IMMNotificationClient`). Switching the default device uses Windows' undocumented `IPolicyConfig` (the interface the Sound settings use) for all three roles (console, multimedia, communications); a Windows test sets the current default again to prove the interface on each Windows build. "Default" means the console role, as in Sound settings. Every COM call runs on a thread-pool (MTA) thread.
+  - **Volume** is a slider (decided; HA `mode: slider`), 0–100 in steps of 1, published as a whole percentage. Commands accept integers or decimals and are clamped to 0–100.
+  - **Output device options** are Windows' device names, made unique (`Headset`, `Headset (2)`). When devices are added, removed, or renamed, the select's discovery config is republished with the new options, through `IModuleContext.UpdateEntityAsync` (3.3: a module may update one of its own entities' description; key and component can't change). With no playback device, the only option is `No output device`. Choosing an option that no longer exists is ignored and the real default is republished.
+  - **Updates:** Windows' device and volume notifications trigger a refresh, coalesced over 150 ms (a volume drag sends many), plus a safety refresh every 60 s and after wake. Only changed values are published. A missing device publishes `None` (HA shows *unknown*).
 
 ### 5.5 System Metrics
 
@@ -708,6 +719,7 @@ Conventions:
 - Verified on BOX1 (hardware sensors, LHM 0.9.6 with PawnIO): `hardware_status` is `ok`, so the anti-spoofing checks pass against the real LHM; CPU and SSD temperatures map by rule. BOX1's Gigabyte board (ITE IT8688E) names its fans "Fan #1".."Fan #5", so `cpu_fan` needs a `sensorOverrides` entry, as designed (the rules never guess). Its real `data.json` is a test fixture.
 - Verified on BOX1 (milestone 6 complete): CPU, memory, disk, network and GPU usage match Task Manager; CPU power, GPU temperature and GPU power level appear; hardware sensors from LHM 0.9.6 read `ok` with plausible values (CPU fan via `sensorOverrides`); Windows tests pass on BOX1 and in CI (run #10, after fixing the protected-folder check that failed when tests ran elevated).
 - An existing `settings.json` gains settings added in newer versions automatically at startup (section 7), instead of users pasting them in.
+- Milestone 7 decisions: Core Audio through our own COM interop instead of NAudio (nothing to pin or vet); volume as a slider; Presence ignores the Monitor on mouse nudge.
 - Media player (5.9, decided before milestone 7): the PC becomes a `media_player` through the MQTT Media Player HACS add-on (option B), chosen over a DLNA renderer (no new network listener) and a custom HA integration (too large). It mirrors the Windows media session; announcements play over it with the app ducking other apps itself; album art is deferred. New milestone 8, after Display and Audio; Notifications and the settings window move to 9 and 10.
 - Audio additions (decided before milestone 7): `mic_muted` switch (show and change the default mic's mute) and `output_device` as a `select` to change the default output device.
 - `uptime` is published in hours (`h`, one decimal) instead of seconds, for readability (after milestone 6).

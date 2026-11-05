@@ -322,6 +322,50 @@ public sealed class ModuleHostTests : IDisposable
         _transport.Publications.ShouldAllBe(p => !p.Topic.Contains("Bad", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task UpdateEntity_RepublishesItsDiscoveryRetained()
+    {
+        await StartAndConnectAsync();
+        var updated = FakeModule.Sensor("cpu_usage") with { Name = "CPU load", UnitOfMeasurement = "%" };
+
+        await _metrics.Context!.UpdateEntityAsync(updated, Ct);
+
+        var configs = _transport.PublishedTo("homeassistant/sensor/DESKTOP-ABC123/cpu_usage/config");
+        configs.Count.ShouldBe(2);
+        configs[^1].Retain.ShouldBeTrue();
+        configs[^1].Payload.ShouldContain("\"name\":\"CPU load\"");
+        _host.Catalog.TryGet("cpu_usage", out var entry).ShouldBeTrue();
+        entry.Entity.Name.ShouldBe("CPU load");
+    }
+
+    [Fact]
+    public async Task UpdateEntity_IsKeptForTheNextConnect_WhenDisconnected()
+    {
+        await _host.StartAsync(Ct);
+
+        await _metrics.Context!.UpdateEntityAsync(FakeModule.Sensor("cpu_usage") with { Name = "CPU load" }, Ct);
+        await ConnectAsync();
+
+        _transport.PublishedTo("homeassistant/sensor/DESKTOP-ABC123/cpu_usage/config").ShouldHaveSingleItem().Payload.ShouldContain("CPU load");
+    }
+
+    [Fact]
+    public async Task UpdateEntity_InvalidChanges_AreRejected()
+    {
+        await StartAndConnectAsync();
+        var before = _transport.Publications.Count;
+
+        // Another module's key, a new key, a component change, and an invalid entity.
+        await _metrics.Context!.UpdateEntityAsync(FakeModule.Sensor("uptime"), Ct);
+        await _metrics.Context!.UpdateEntityAsync(FakeModule.Sensor("gpu_usage"), Ct);
+        await _metrics.Context!.UpdateEntityAsync(new EntityDescriptor("cpu_usage", "CPU", EntityComponent.BinarySensor), Ct);
+        await _metrics.Context!.UpdateEntityAsync(new EntityDescriptor("cpu_usage", " ", EntityComponent.Sensor), Ct);
+
+        _transport.Publications.Count.ShouldBe(before);
+        _host.Catalog.TryGet("cpu_usage", out var entry).ShouldBeTrue();
+        entry.Entity.Name.ShouldBe("cpu usage");
+    }
+
     private async Task StartAndConnectAsync()
     {
         await _host.StartAsync(Ct);

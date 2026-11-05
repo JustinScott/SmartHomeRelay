@@ -85,6 +85,7 @@ public sealed class MqttTopics
         EntityComponent.Button => "button",
         EntityComponent.Switch => "switch",
         EntityComponent.Number => "number",
+        EntityComponent.Select => "select",
         _ => throw new ArgumentOutOfRangeException(nameof(component), component, "Unknown component."),
     };
 }

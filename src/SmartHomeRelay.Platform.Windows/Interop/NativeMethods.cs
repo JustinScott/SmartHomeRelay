@@ -32,6 +32,24 @@ internal static partial class NativeMethods
     /// <summary><c>IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS</c>.</summary>
     public const uint IoctlVolumeGetVolumeDiskExtents = 0x00560000;
 
+    /// <summary><c>HWND_BROADCAST</c>.</summary>
+    public static readonly nint HwndBroadcast = 0xFFFF;
+
+    /// <summary><c>WM_SYSCOMMAND</c>.</summary>
+    public const uint WmSysCommand = 0x0112;
+
+    /// <summary><c>SC_MONITORPOWER</c>; lParam 2 = off.</summary>
+    public const nint ScMonitorPower = 0xF170;
+
+    /// <summary><c>SMTO_ABORTIFHUNG</c>: don't wait for windows that stopped responding.</summary>
+    public const uint SmtoAbortIfHung = 0x0002;
+
+    /// <summary><c>MOUSEEVENTF_MOVE</c>.</summary>
+    public const uint MouseEventMove = 0x0001;
+
+    /// <summary><c>ES_DISPLAY_REQUIRED</c>: resets the display idle timer (wakes the display).</summary>
+    public const uint EsDisplayRequired = 0x00000002;
+
     /// <summary>The local server, for the WTS functions.</summary>
     public static readonly nint WtsCurrentServerHandle = 0;
 
@@ -101,4 +119,13 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool DeviceIoControl(Microsoft.Win32.SafeHandles.SafeFileHandle device, uint controlCode, nint inBuffer, uint inSize, out VolumeDiskExtents outBuffer, uint outSize, out uint bytesReturned, nint overlapped);
+
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageTimeoutW", SetLastError = true)]
+    public static partial nint SendMessageTimeout(nint window, uint message, nint wParam, nint lParam, uint flags, uint timeoutMs, out nint result);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial uint SendInput(uint count, [In] InputRecord[] inputs, int size);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial uint SetThreadExecutionState(uint flags);
 }
