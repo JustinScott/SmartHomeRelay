@@ -76,7 +76,7 @@ Open `settings.json` (tray menu → **Settings**). The `mediaPlayer` section und
 
 ## 4. Check it
 
-1. In Home Assistant, the Smart Home Relay device now has a media player named after the PC. The add-on also adds an **MQTT Media Player** entry under **Settings → Devices & services**.
+1. In Home Assistant, a new device named after the PC plus "Media Player" (for example **BOX1 Media Player**) has the player. It's a separate device from the PC's other sensors and buttons because the add-on creates its own; give both the same area. The add-on also adds an **MQTT Media Player** entry under **Settings → Devices & services**.
 2. Play something on the PC (Spotify, YouTube in a browser). The player shows the title and artist, and play/pause from Home Assistant works.
 3. Try text-to-speech: **Developer tools → Actions**, choose `tts.speak`, pick your TTS entity, set **Media player** to the PC, enter a message, and run it. The music gets quieter, the message plays, and the music comes back.
 

@@ -101,17 +101,23 @@ public static class DiscoveryPayloadBuilder
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
-    /// <summary>Writes the <c>device</c> block shared by every entity and custom component.</summary>
+    /// <summary>Writes the <c>device</c> block shared by every entity.</summary>
     public static void WriteDevice(Utf8JsonWriter json, DeviceSettings device, string swVersion)
     {
-        ArgumentNullException.ThrowIfNull(json);
         ArgumentNullException.ThrowIfNull(device);
+        WriteDevice(json, device.Id, device.Name, swVersion);
+    }
+
+    /// <summary>Writes a <c>device</c> block with our manufacturer and model and the given identifier and name.</summary>
+    public static void WriteDevice(Utf8JsonWriter json, string identifier, string name, string swVersion)
+    {
+        ArgumentNullException.ThrowIfNull(json);
 
         json.WriteStartObject("device");
         json.WriteStartArray("identifiers");
-        json.WriteStringValue(device.Id);
+        json.WriteStringValue(identifier);
         json.WriteEndArray();
-        json.WriteString("name", device.Name);
+        json.WriteString("name", name);
         json.WriteString("manufacturer", Manufacturer);
         json.WriteString("model", Model);
         json.WriteString("sw_version", swVersion);

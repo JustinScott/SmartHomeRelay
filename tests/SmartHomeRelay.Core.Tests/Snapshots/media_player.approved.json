@@ -1,5 +1,5 @@
 {
-  "name": "Desk PC",
+  "name": "Desk PC Media Player",
   "availability": {
     "topic": "shr/DESKTOP-ABC123/status",
     "payload_available": "online",
@@ -25,9 +25,9 @@
   "command_seek_topic": "shr/DESKTOP-ABC123/media_player/command/seek",
   "device": {
     "identifiers": [
-      "DESKTOP-ABC123"
+      "DESKTOP-ABC123_media_player"
     ],
-    "name": "Desk PC",
+    "name": "Desk PC Media Player",
     "manufacturer": "Smart Home Relay",
     "model": "Windows PC",
     "sw_version": "1.0.0"

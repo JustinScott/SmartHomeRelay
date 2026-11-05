@@ -72,6 +72,21 @@ public sealed class MediaPlayerModuleTests : IAsyncDisposable
     }
 
     [Fact]
+    public void Config_HasItsOwnDevice_NeverSharingOurDevicesIdentifier()
+    {
+        // Found on BOX1: the add-on creates its own device, so a shared identifier gave two devices the same one.
+        var settings = FakeSettingsState.Configured();
+        var topics = new CustomComponentTopics(new MqttTopics(settings.Mqtt, settings.Device), C, settings.Device, "1.0.0");
+
+        using var config = System.Text.Json.JsonDocument.Parse(MediaPlayerConfig.Build(topics));
+        var device = config.RootElement.GetProperty("device");
+
+        device.GetProperty("identifiers").EnumerateArray().Select(e => e.GetString()).ShouldBe([$"{settings.Device.Id}_media_player"]);
+        device.GetProperty("name").GetString().ShouldBe($"{settings.Device.Name} Media Player");
+        config.RootElement.GetProperty("name").GetString().ShouldBe($"{settings.Device.Name} Media Player");
+    }
+
+    [Fact]
     public async Task Start_MirrorsTheSession_AndTheVolume()
     {
         await _module.StartAsync(_context, Ct);

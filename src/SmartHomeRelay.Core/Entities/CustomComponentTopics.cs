@@ -39,4 +39,15 @@ public sealed class CustomComponentTopics
 
     /// <summary>Writes the same <c>device</c> block every entity has, so the component lands on the same HA device.</summary>
     public void WriteDevice(Utf8JsonWriter json) => DiscoveryPayloadBuilder.WriteDevice(json, Device, SwVersion);
+
+    /// <summary>
+    /// Writes a <c>device</c> block for a device of its own, <c>{device id}_{component}</c>, named
+    /// <c>{device name} {displayName}</c>. For integrations other than HA's MQTT one, which create their own device:
+    /// sharing our device's identifier there would give two devices the same identifier.
+    /// </summary>
+    public void WriteOwnDevice(Utf8JsonWriter json, string displayName) =>
+        DiscoveryPayloadBuilder.WriteDevice(json, OwnDeviceIdentifier, $"{Device.Name} {displayName}", SwVersion);
+
+    /// <summary>The identifier <see cref="WriteOwnDevice"/> uses: <c>{device id}_{component}</c>.</summary>
+    public string OwnDeviceIdentifier => $"{Device.Id}_{ComponentName}";
 }

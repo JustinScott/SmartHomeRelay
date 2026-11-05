@@ -8,9 +8,14 @@ namespace SmartHomeRelay.Core.Features.MediaPlayer;
 /// <summary>
 /// The discovery config in the format of the MQTT Media Player add-on, tested version 2026.10.1 (spec 5.9).
 /// The add-on infers its features from which command topics are present. Deterministic for snapshot tests.
+/// The add-on creates a device of its own, so the player gets its own device, <c>{device id}_media_player</c>
+/// named "{device name} Media Player"; reusing our device's identifier made two devices share it (found on BOX1).
 /// </summary>
 public static class MediaPlayerConfig
 {
+    /// <summary>Shown after the PC's name, e.g. "BOX1 Media Player".</summary>
+    public const string DeviceDisplayName = "Media Player";
+
     /// <summary>Builds the config.</summary>
     public static string Build(CustomComponentTopics topics)
     {
@@ -20,7 +25,7 @@ public static class MediaPlayerConfig
         using (var json = new Utf8JsonWriter(stream))
         {
             json.WriteStartObject();
-            json.WriteString("name", topics.Device.Name);
+            json.WriteString("name", $"{topics.Device.Name} {DeviceDisplayName}");
 
             json.WriteStartObject("availability");
             json.WriteString("topic", topics.Availability);
@@ -48,7 +53,7 @@ public static class MediaPlayerConfig
             json.WriteString("command_playmedia_topic", topics.Command(MediaPlayerKeys.PlayMedia));
             json.WriteString("command_seek_topic", topics.Command(MediaPlayerKeys.Seek));
 
-            topics.WriteDevice(json);
+            topics.WriteOwnDevice(json, DeviceDisplayName);
             json.WriteEndObject();
         }
 
