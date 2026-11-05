@@ -30,6 +30,7 @@
     "name": "Desk PC Media Player",
     "manufacturer": "Smart Home Relay",
     "model": "Windows PC",
-    "sw_version": "1.0.0"
+    "sw_version": "1.0.0",
+    "via_device": "DESKTOP-ABC123"
   }
 }

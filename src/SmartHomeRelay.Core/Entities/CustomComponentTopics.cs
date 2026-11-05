@@ -42,11 +42,12 @@ public sealed class CustomComponentTopics
 
     /// <summary>
     /// Writes a <c>device</c> block for a device of its own, <c>{device id}_{component}</c>, named
-    /// <c>{device name} {displayName}</c>. For integrations other than HA's MQTT one, which create their own device:
-    /// sharing our device's identifier there would give two devices the same identifier.
+    /// <c>{device name} {displayName}</c>, connected through our device (<c>via_device</c>). For integrations other
+    /// than HA's MQTT one, which create their own device: sharing our device's identifier there would give two
+    /// devices the same identifier.
     /// </summary>
     public void WriteOwnDevice(Utf8JsonWriter json, string displayName) =>
-        DiscoveryPayloadBuilder.WriteDevice(json, OwnDeviceIdentifier, $"{Device.Name} {displayName}", SwVersion);
+        DiscoveryPayloadBuilder.WriteDevice(json, OwnDeviceIdentifier, $"{Device.Name} {displayName}", SwVersion, viaDevice: Device.Id);
 
     /// <summary>The identifier <see cref="WriteOwnDevice"/> uses: <c>{device id}_{component}</c>.</summary>
     public string OwnDeviceIdentifier => $"{Device.Id}_{ComponentName}";

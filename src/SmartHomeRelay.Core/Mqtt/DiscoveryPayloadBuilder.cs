@@ -108,8 +108,11 @@ public static class DiscoveryPayloadBuilder
         WriteDevice(json, device.Id, device.Name, swVersion);
     }
 
-    /// <summary>Writes a <c>device</c> block with our manufacturer and model and the given identifier and name.</summary>
-    public static void WriteDevice(Utf8JsonWriter json, string identifier, string name, string swVersion)
+    /// <summary>
+    /// Writes a <c>device</c> block with our manufacturer and model and the given identifier and name, plus
+    /// <c>via_device</c> (the identifier of the device it is connected through) when given.
+    /// </summary>
+    public static void WriteDevice(Utf8JsonWriter json, string identifier, string name, string swVersion, string? viaDevice = null)
     {
         ArgumentNullException.ThrowIfNull(json);
 
@@ -121,6 +124,11 @@ public static class DiscoveryPayloadBuilder
         json.WriteString("manufacturer", Manufacturer);
         json.WriteString("model", Model);
         json.WriteString("sw_version", swVersion);
+        if (!string.IsNullOrEmpty(viaDevice))
+        {
+            json.WriteString("via_device", viaDevice);
+        }
+
         json.WriteEndObject();
     }
 

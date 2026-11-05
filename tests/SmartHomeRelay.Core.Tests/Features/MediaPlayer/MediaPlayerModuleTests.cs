@@ -83,6 +83,7 @@ public sealed class MediaPlayerModuleTests : IAsyncDisposable
 
         device.GetProperty("identifiers").EnumerateArray().Select(e => e.GetString()).ShouldBe([$"{settings.Device.Id}_media_player"]);
         device.GetProperty("name").GetString().ShouldBe($"{settings.Device.Name} Media Player");
+        device.GetProperty("via_device").GetString().ShouldBe(settings.Device.Id, "linked to the PC's device");
         config.RootElement.GetProperty("name").GetString().ShouldBe($"{settings.Device.Name} Media Player");
     }
 
