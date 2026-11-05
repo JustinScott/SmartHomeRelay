@@ -21,6 +21,12 @@ public sealed record ToastContent
     /// <summary>Stays on screen longer (about 25 seconds instead of 5).</summary>
     public bool LongDuration { get; init; }
 
+    /// <summary>
+    /// Stays on screen until it is removed or a button is clicked (Windows' reminder scenario), instead of moving to
+    /// the notification center after a few seconds. Needs at least one button.
+    /// </summary>
+    public bool StayOnScreen { get; init; }
+
     /// <summary>No sound.</summary>
     public bool Silent { get; init; }
 

@@ -28,6 +28,12 @@ public static class ToastXmlBuilder
             toast.Add(new XAttribute("duration", "long"));
         }
 
+        // Windows ignores the reminder scenario without a button.
+        if (content.StayOnScreen && content.Buttons.Count > 0)
+        {
+            toast.Add(new XAttribute("scenario", "reminder"));
+        }
+
         var binding = new XElement("binding", new XAttribute("template", "ToastGeneric"));
         if (content.Title.Length > 0)
         {

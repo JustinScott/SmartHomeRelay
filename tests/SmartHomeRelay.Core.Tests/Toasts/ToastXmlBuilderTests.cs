@@ -51,6 +51,21 @@ public sealed class ToastXmlBuilderTests
     }
 
     [Fact]
+    public void StayOnScreen_IsTheReminderScenario_OnlyWithAButton()
+    {
+        var withButton = ToastXmlBuilder.Build(new ToastContent
+        {
+            Title = "T",
+            Buttons = [new ToastButton("Stop", "shr:media_player:stop", OpensUrl: false)],
+            StayOnScreen = true,
+        });
+        var withoutButton = ToastXmlBuilder.Build(new ToastContent { Title = "T", StayOnScreen = true });
+
+        withButton.ShouldStartWith("<toast scenario=\"reminder\">");
+        withoutButton.ShouldNotContain("scenario");
+    }
+
+    [Fact]
     public void AtMostFiveButtons_AndEmptyTitleIsLeftOut()
     {
         var buttons = Enumerable.Range(1, 7).Select(i => new ToastButton($"B{i}", $"https://x/{i}", true)).ToList();

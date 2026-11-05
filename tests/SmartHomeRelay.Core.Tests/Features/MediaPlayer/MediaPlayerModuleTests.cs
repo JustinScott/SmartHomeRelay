@@ -241,6 +241,7 @@ public sealed class MediaPlayerModuleTests : IAsyncDisposable
         await Eventually.TrueAsync(() => _player.Started == 1, "the announcement starts");
         var notice = _toasts.Shown.ShouldHaveSingleItem();
         notice.Silent.ShouldBeTrue();
+        notice.StayOnScreen.ShouldBeTrue();
         notice.Tag.ShouldBe(MediaAnnouncer.NoticeTag);
         notice.Buttons.ShouldHaveSingleItem().OpensUrl.ShouldBeFalse();
 

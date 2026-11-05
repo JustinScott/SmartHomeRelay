@@ -36,7 +36,9 @@ public sealed partial class MediaAnnouncer : IDisposable
         Title = "Home Assistant is speaking",
         Buttons = [new ToastButton("Stop", StopArguments, OpensUrl: false)],
         Silent = true,
-        LongDuration = true,
+
+        // On screen for as long as the audio plays: removed when it ends.
+        StayOnScreen = true,
         Tag = NoticeTag,
         Group = NoticeGroup,
 
