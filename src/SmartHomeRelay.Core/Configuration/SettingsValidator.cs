@@ -19,6 +19,10 @@ public sealed class SettingsValidator
     internal const int MinHardwareIntervalSeconds = 5;
     internal const int MaxHardwareIntervalSeconds = 3_600;
 
+    internal const long MaxMediaDownloadBytes = 200L * 1024 * 1024;
+    internal const int MaxMediaDownloadTimeoutSeconds = 300;
+    internal const int MaxPositionIntervalSeconds = 300;
+
     private static readonly char[] s_topicWildcards = ['+', '#'];
 
     /// <summary>Returns every problem found; an empty list means the settings are valid.</summary>
@@ -118,6 +122,20 @@ public sealed class SettingsValidator
             errors);
 
         ValidateHardware(features.Hardware, errors);
+        ValidateMediaPlayer(features.MediaPlayer, errors);
+    }
+
+    private static void ValidateMediaPlayer(MediaPlayerSettings media, List<string> errors)
+    {
+        if (media.Interruption is not (MediaPlayerSettings.InterruptionDuck or MediaPlayerSettings.InterruptionPause))
+        {
+            errors.Add("features.mediaPlayer.interruption must be \"duck\" or \"pause\".");
+        }
+
+        ValidateRange("features.mediaPlayer.duckLevelPercent", media.DuckLevelPercent, 0, 100, errors);
+        ValidateRange("features.mediaPlayer.maxDownloadBytes", media.MaxDownloadBytes, 1, MaxMediaDownloadBytes, errors);
+        ValidateRange("features.mediaPlayer.downloadTimeoutSeconds", media.DownloadTimeoutSeconds, 1, MaxMediaDownloadTimeoutSeconds, errors);
+        ValidateRange("features.mediaPlayer.positionIntervalSeconds", media.PositionIntervalSeconds, 1, MaxPositionIntervalSeconds, errors);
     }
 
     private static void ValidateHardware(HardwareSettings hardware, List<string> errors)

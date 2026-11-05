@@ -54,6 +54,36 @@ public sealed class MqttTopics
     public string Discovery(EntityComponent component, string entityKey) =>
         $"{_discoveryPrefix}/{ComponentName(component)}/{DeviceId}/{entityKey}/config";
 
+    /// <summary><c>{baseTopic}/{deviceId}/{component}/{state}</c>: a custom component's state (spec 3.3).</summary>
+    public string CustomState(string component, string state) => $"{_deviceRoot}/{component}/{state}";
+
+    /// <summary><c>{baseTopic}/{deviceId}/{component}/command/{command}</c>: a custom component's command.</summary>
+    public string CustomCommand(string component, string command) => $"{_deviceRoot}/{component}/command/{command}";
+
+    /// <summary>Returns the component and command if <paramref name="topic"/> is a custom component's command topic.</summary>
+    public bool TryGetCustomCommand(string topic, out string component, out string command)
+    {
+        ArgumentNullException.ThrowIfNull(topic);
+
+        component = string.Empty;
+        command = string.Empty;
+        var prefix = _deviceRoot + "/";
+        if (!topic.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var parts = topic[prefix.Length..].Split('/');
+        if (parts.Length != 3 || parts[1] != "command" || !EntityValidator.IsValidKey(parts[0]) || !EntityValidator.IsValidKey(parts[2]))
+        {
+            return false;
+        }
+
+        component = parts[0];
+        command = parts[2];
+        return true;
+    }
+
     /// <summary>Returns the entity key if <paramref name="topic"/> is one of this device's command topics.</summary>
     public bool TryGetCommandKey(string topic, out string entityKey)
     {

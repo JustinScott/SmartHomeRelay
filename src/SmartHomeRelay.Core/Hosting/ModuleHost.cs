@@ -25,6 +25,7 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly HashSet<string> _running = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _states = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(string Component, string State), string> _customStates = new();
     private readonly ConcurrentDictionary<long, Task> _background = new();
     private readonly CancellationTokenSource _stopping = new();
     private EntityCatalog _catalog = EntityCatalog.Build([]);
@@ -106,6 +107,7 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         // needs a resubscribe; commands for disabled entities are ignored at dispatch.
         var subscriptions = new List<string> { topics.HomeAssistantStatus };
         subscriptions.AddRange(_catalog.Entries.Where(e => e.Entity.AcceptsCommands).Select(e => topics.Command(e.Entity.Key)));
+        subscriptions.AddRange(_catalog.CustomComponents.SelectMany(c => c.Component.Commands.Select(command => topics.CustomCommand(c.Component.Name, command))));
         await _transport.SubscribeAsync(subscriptions, cancellationToken).ConfigureAwait(false);
 
         await PublishDiscoveryAndStateAsync(session, cancellationToken).ConfigureAwait(false);
@@ -174,6 +176,80 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         }
     }
 
+    internal async Task PublishCustomStateAsync(IFeatureModule module, string component, string state, string payload, CancellationToken cancellationToken)
+    {
+        if (!_catalog.TryGetCustom(component, out var entry) || entry.Module != module || !entry.Component.States.Contains(state))
+        {
+            LogUnknownStateKey(_logger, module.Id, $"{component}/{state}");
+            return;
+        }
+
+        _customStates[(component, state)] = payload;
+
+        var session = Volatile.Read(ref _session);
+        if (session is null || !_transport.IsConnected)
+        {
+            return;
+        }
+
+        try
+        {
+            await PublishCustomStateAsync(session, entry.Component, state, payload, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            LogStatePublishFailed(_logger, ex, $"{component}/{state}");
+        }
+    }
+
+    private Task PublishCustomStateAsync(Session session, CustomComponent component, string state, string payload, CancellationToken cancellationToken) =>
+        _transport.PublishAsync(session.Topics.CustomState(component.Name, state), payload, MqttQos.AtMostOnce, component.RetainStates, cancellationToken);
+
+    /// <summary>
+    /// Custom components (spec 3.3): the config when enabled, else an empty retained config plus the
+    /// component's disabled states; then the kept states of enabled ones.
+    /// </summary>
+    private async Task PublishCustomComponentsAsync(Session session, AppSettings enabledSettings, CancellationToken cancellationToken)
+    {
+        foreach (var entry in _catalog.CustomComponents)
+        {
+            var component = entry.Component;
+            var enabled = IsEnabled(entry.Module, enabledSettings);
+            string config;
+            try
+            {
+                config = enabled
+                    ? component.BuildConfig(new CustomComponentTopics(session.Topics, component.Name, session.Settings.Device, RelayVersion.Current))
+                    : string.Empty;
+            }
+            catch (Exception ex)
+            {
+                LogCustomConfigFailed(_logger, ex, component.Name);
+                continue;
+            }
+
+            await _transport.PublishAsync(component.DiscoveryTopic(session.Topics.DeviceId), config, MqttQos.AtLeastOnce, retain: true, cancellationToken).ConfigureAwait(false);
+
+            if (!enabled)
+            {
+                foreach (var (state, payload) in component.DisabledStates)
+                {
+                    await PublishCustomStateAsync(session, component, state, payload, cancellationToken).ConfigureAwait(false);
+                }
+
+                continue;
+            }
+
+            foreach (var ((name, state), payload) in _customStates)
+            {
+                if (name == component.Name)
+                {
+                    await PublishCustomStateAsync(session, component, state, payload, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+    }
+
     private async Task PublishDiscoveryAndStateAsync(Session session, CancellationToken cancellationToken)
     {
         var enabledSettings = CurrentValidSettings() ?? session.Settings;
@@ -198,6 +274,8 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
                 await PublishStateAsync(session, entry, payload, cancellationToken).ConfigureAwait(false);
             }
         }
+
+        await PublishCustomComponentsAsync(session, enabledSettings, cancellationToken).ConfigureAwait(false);
 
         LogDiscoveryPublished(_logger, _catalog.Entries.Count(), _states.Count);
     }
@@ -224,6 +302,12 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
             return;
         }
 
+        if (session.Topics.TryGetCustomCommand(message.Topic, out var componentName, out var command))
+        {
+            OnCustomCommand(session, componentName, command, message.Payload);
+            return;
+        }
+
         if (!session.Topics.TryGetCommandKey(message.Topic, out var key)
             || !_catalog.TryGet(key, out var entry)
             || entry.Entity.CommandHandler is not { } handler)
@@ -241,6 +325,26 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
 
         // Never run handlers inside the MQTT receive callback: a slow one would block other commands.
         RunInBackground(ct => handler(message.Payload, ct), key);
+    }
+
+    private void OnCustomCommand(Session session, string componentName, string command, string payload)
+    {
+        if (!_catalog.TryGetCustom(componentName, out var entry)
+            || entry.Component.CommandHandler is not { } handler
+            || !entry.Component.Commands.Contains(command))
+        {
+            return;
+        }
+
+        var label = $"{componentName}/{command}";
+        if (!IsEnabled(entry.Module, CurrentValidSettings() ?? session.Settings))
+        {
+            LogCommandForDisabledEntity(_logger, label);
+            return;
+        }
+
+        LogCommandReceived(_logger, label);
+        RunInBackground(ct => handler(command, payload, ct), label);
     }
 
     private void OnDisconnected(object? sender, EventArgs e) => Volatile.Write(ref _session, null);
@@ -316,6 +420,11 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
         foreach (var entry in _catalog.Entries.Where(e => e.Module == module))
         {
             _states.TryRemove(entry.Entity.Key, out _);
+        }
+
+        foreach (var key in _customStates.Keys.Where(k => _catalog.TryGetCustom(k.Component, out var c) && c.Module == module))
+        {
+            _customStates.TryRemove(key, out _);
         }
 
         try
@@ -464,6 +573,9 @@ public sealed partial class ModuleHost : IHostedService, IMqttSessionHandler, ID
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Module {ModuleId} tried an invalid entity update; kept the previous one: {Problem}")]
     private static partial void LogEntityUpdateRejected(ILogger logger, string moduleId, string problem);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Building the discovery config of custom component {Component} failed")]
+    private static partial void LogCustomConfigFailed(ILogger logger, Exception exception, string component);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Background work failed")]
     private static partial void LogBackgroundWorkFailed(ILogger logger, Exception exception);

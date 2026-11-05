@@ -27,6 +27,18 @@ internal sealed class RecordingModuleContext : IModuleContext
         return Task.CompletedTask;
     }
 
+    public ConcurrentQueue<(string Component, string State, string Payload)> CustomPublished { get; } = new();
+
+    public Task PublishCustomStateAsync(string component, string state, string payload, CancellationToken cancellationToken)
+    {
+        CustomPublished.Enqueue((component, state, payload));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The most recent payload of a custom component's state, or null if never published.</summary>
+    public string? LatestCustom(string component, string state) =>
+        CustomPublished.LastOrDefault(p => p.Component == component && p.State == state).Payload;
+
     /// <summary>The most recent payload for <paramref name="key"/>, or null if never published.</summary>
     public string? Latest(string key) => Published.LastOrDefault(p => p.Key == key).Payload;
 

@@ -11,16 +11,19 @@ using SmartHomeRelay.Core.Features;
 using SmartHomeRelay.Core.Features.Audio;
 using SmartHomeRelay.Core.Features.Display;
 using SmartHomeRelay.Core.Features.Hardware;
+using SmartHomeRelay.Core.Features.MediaPlayer;
 using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
+using SmartHomeRelay.Core.Net;
 using SmartHomeRelay.Platform.Windows;
 using SmartHomeRelay.Platform.Windows.Audio;
 using SmartHomeRelay.Platform.Windows.Configuration;
 using SmartHomeRelay.Platform.Windows.Display;
 using SmartHomeRelay.Platform.Windows.Hardware;
 using SmartHomeRelay.Platform.Windows.Hosting;
+using SmartHomeRelay.Platform.Windows.Media;
 using SmartHomeRelay.Platform.Windows.Metrics;
 using SmartHomeRelay.Platform.Windows.Power;
 using SmartHomeRelay.Platform.Windows.Presence;
@@ -90,6 +93,13 @@ internal static class Program
         // Hardware sensors from a user-managed LibreHardwareMonitor (spec 5.8)
         builder.Services.AddSingleton<ILibreHardwareMonitorEndpoint, WindowsLibreHardwareMonitorEndpoint>();
         builder.Services.AddSingleton<IFeatureModule, HardwareModule>();
+
+        // Media player through the MQTT Media Player add-on (spec 5.9); volume and mute reuse IAudioController
+        builder.Services.AddSingleton<IMediaSessionSource, WindowsMediaSessionSource>();
+        builder.Services.AddSingleton<IAnnouncementPlayer, WindowsAnnouncementPlayer>();
+        builder.Services.AddSingleton<IAudioDucker, WindowsAudioDucker>();
+        builder.Services.AddSingleton<IHttpDownloader, LimitedHttpDownloader>();
+        builder.Services.AddSingleton<IFeatureModule, MediaPlayerModule>();
 
         using var host = builder.Build();
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SmartHomeRelay.App");

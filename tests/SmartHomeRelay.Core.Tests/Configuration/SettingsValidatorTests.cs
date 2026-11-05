@@ -248,6 +248,47 @@ public sealed class SettingsValidatorTests
         new SettingsValidator().Validate(settings).ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Validate_MediaPlayerDefaults_AreValid()
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.MediaPlayer.Enabled = true;
+
+        new SettingsValidator().Validate(settings).ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("Duck")]
+    [InlineData("mute")]
+    [InlineData("")]
+    public void Validate_MediaPlayerInterruption_MustBeDuckOrPause(string value)
+    {
+        var settings = TestSettings.Valid();
+        settings.Features.MediaPlayer.Interruption = value;
+
+        new SettingsValidator().Validate(settings).ShouldContain(e => e.StartsWith("features.mediaPlayer.interruption", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("duckLevelPercent")]
+    [InlineData("maxDownloadBytes")]
+    [InlineData("downloadTimeoutSeconds")]
+    [InlineData("positionIntervalSeconds")]
+    public void Validate_MediaPlayerNumbers_OutOfRange(string name)
+    {
+        var settings = TestSettings.Valid();
+        var media = settings.Features.MediaPlayer;
+        switch (name)
+        {
+            case "duckLevelPercent": media.DuckLevelPercent = 101; break;
+            case "maxDownloadBytes": media.MaxDownloadBytes = 0; break;
+            case "downloadTimeoutSeconds": media.DownloadTimeoutSeconds = 0; break;
+            default: media.PositionIntervalSeconds = 0; break;
+        }
+
+        new SettingsValidator().Validate(settings).ShouldContain(e => e.StartsWith($"features.mediaPlayer.{name}", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(0, "features.hardware.port")]
     [InlineData(70_000, "features.hardware.port")]

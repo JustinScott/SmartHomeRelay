@@ -14,4 +14,7 @@ internal sealed class ModuleContext(ModuleHost host, IFeatureModule module, ILog
 
     public Task UpdateEntityAsync(EntityDescriptor entity, CancellationToken cancellationToken) =>
         host.UpdateEntityAsync(module, entity, cancellationToken);
+
+    public Task PublishCustomStateAsync(string component, string state, string payload, CancellationToken cancellationToken) =>
+        host.PublishCustomStateAsync(module, component, state, payload, cancellationToken);
 }

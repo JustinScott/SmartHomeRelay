@@ -30,6 +30,8 @@ public sealed class ModuleContractTests
             new SmartHomeRelay.Core.Features.Display.DisplayModule(new FakeDisplayController()),
             new SmartHomeRelay.Core.Features.Audio.AudioModule(new FakeAudioController(), TimeProvider.System),
             new HardwareModule(new FakeLhmEndpoint(), settings, new FakeSecretProtector(), new FakeUserNotifier(), TimeProvider.System),
+            new SmartHomeRelay.Core.Features.MediaPlayer.MediaPlayerModule(
+                settings, new FakeMediaSession(), new FakeAudioController(), new FakeAnnouncementPlayer(), new FakeAudioDucker(), new FakeHttpDownloader(), TimeProvider.System),
         ];
     }
 
@@ -76,6 +78,7 @@ public sealed class ModuleContractTests
         allOff.Features.Metrics.Enabled = false;
         allOff.Features.Notifications.Enabled = false;
         allOff.Features.Hardware.Enabled = false;
+        allOff.Features.MediaPlayer.Enabled = false;
 
         foreach (var module in AllModules())
         {

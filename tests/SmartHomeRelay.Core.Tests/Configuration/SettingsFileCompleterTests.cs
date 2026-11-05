@@ -44,7 +44,19 @@ public sealed class SettingsFileCompleterTests : IDisposable
         hardware["port"]!.GetValue<int>().ShouldBe(8085);
         hardware["password"]!.GetValue<string>().ShouldBe(string.Empty, "the placeholder shows where to type");
         hardware["sensors"]!.AsArray().Select(n => n!.GetValue<string>()).ShouldBe(["cpu_temperature", "cpu_fan", "ssd_temperature"]);
-        Keys(root["features"]!).ShouldBe(["presence", "power", "display", "audio", "metrics", "notifications", "hardware"]);
+        Keys(root["features"]!).ShouldBe(["presence", "power", "display", "audio", "metrics", "notifications", "hardware", "mediaPlayer"]);
+    }
+
+    [Fact]
+    public async Task OldFile_GetsTheMediaPlayerSection_TurnedOff()
+    {
+        var root = await CompleteAsync(OldFile);
+
+        var media = root["features"]!["mediaPlayer"]!.AsObject();
+        media["enabled"]!.GetValue<bool>().ShouldBeFalse();
+        media["interruption"]!.GetValue<string>().ShouldBe("duck");
+        media["duckLevelPercent"]!.GetValue<int>().ShouldBe(20);
+        media["positionIntervalSeconds"]!.GetValue<int>().ShouldBe(5);
     }
 
     [Fact]

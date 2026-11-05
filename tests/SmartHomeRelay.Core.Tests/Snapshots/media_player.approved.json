@@ -1,0 +1,35 @@
+{
+  "name": "Desk PC",
+  "availability": {
+    "topic": "shr/DESKTOP-ABC123/status",
+    "payload_available": "online",
+    "payload_not_available": "offline"
+  },
+  "state_state_topic": "shr/DESKTOP-ABC123/media_player/state",
+  "state_title_topic": "shr/DESKTOP-ABC123/media_player/title",
+  "state_artist_topic": "shr/DESKTOP-ABC123/media_player/artist",
+  "state_album_topic": "shr/DESKTOP-ABC123/media_player/album",
+  "state_duration_topic": "shr/DESKTOP-ABC123/media_player/duration",
+  "state_position_topic": "shr/DESKTOP-ABC123/media_player/position",
+  "state_volume_topic": "shr/DESKTOP-ABC123/media_player/volume",
+  "state_mute_topic": "shr/DESKTOP-ABC123/media_player/mute",
+  "state_mediatype_topic": "shr/DESKTOP-ABC123/media_player/media_type",
+  "command_volume_topic": "shr/DESKTOP-ABC123/media_player/command/volume",
+  "command_mute_topic": "shr/DESKTOP-ABC123/media_player/command/mute",
+  "command_play_topic": "shr/DESKTOP-ABC123/media_player/command/play",
+  "command_pause_topic": "shr/DESKTOP-ABC123/media_player/command/pause",
+  "command_playpause_topic": "shr/DESKTOP-ABC123/media_player/command/playpause",
+  "command_next_topic": "shr/DESKTOP-ABC123/media_player/command/next",
+  "command_previous_topic": "shr/DESKTOP-ABC123/media_player/command/previous",
+  "command_playmedia_topic": "shr/DESKTOP-ABC123/media_player/command/play_media",
+  "command_seek_topic": "shr/DESKTOP-ABC123/media_player/command/seek",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.0.0"
+  }
+}

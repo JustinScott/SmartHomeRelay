@@ -88,15 +88,7 @@ public static class DiscoveryPayloadBuilder
                 json.WriteEndArray();
             }
 
-            json.WriteStartObject("device");
-            json.WriteStartArray("identifiers");
-            json.WriteStringValue(device.Id);
-            json.WriteEndArray();
-            json.WriteString("name", device.Name);
-            json.WriteString("manufacturer", Manufacturer);
-            json.WriteString("model", Model);
-            json.WriteString("sw_version", swVersion);
-            json.WriteEndObject();
+            WriteDevice(json, device, swVersion);
 
             json.WriteStartObject("origin");
             json.WriteString("name", Manufacturer);
@@ -107,6 +99,23 @@ public static class DiscoveryPayloadBuilder
         }
 
         return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    /// <summary>Writes the <c>device</c> block shared by every entity and custom component.</summary>
+    public static void WriteDevice(Utf8JsonWriter json, DeviceSettings device, string swVersion)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        ArgumentNullException.ThrowIfNull(device);
+
+        json.WriteStartObject("device");
+        json.WriteStartArray("identifiers");
+        json.WriteStringValue(device.Id);
+        json.WriteEndArray();
+        json.WriteString("name", device.Name);
+        json.WriteString("manufacturer", Manufacturer);
+        json.WriteString("model", Model);
+        json.WriteString("sw_version", swVersion);
+        json.WriteEndObject();
     }
 
     private static void WriteComponentFields(Utf8JsonWriter json, EntityDescriptor entity)

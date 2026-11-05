@@ -22,4 +22,10 @@ public interface IModuleContext
     /// the same; anything else is rejected and logged, and the old description stays.
     /// </summary>
     Task UpdateEntityAsync(EntityDescriptor entity, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Publishes one state of one of the module's custom components (spec 3.3). Kept and republished like
+    /// <see cref="PublishStateAsync"/>. An empty payload clears the retained value.
+    /// </summary>
+    Task PublishCustomStateAsync(string component, string state, string payload, CancellationToken cancellationToken);
 }

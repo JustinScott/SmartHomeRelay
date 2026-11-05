@@ -48,6 +48,13 @@ internal static partial class CoreAudioMethods
         return (IAudioEndpointVolume)device.Activate(ref interfaceId, ClassContextAll, 0);
     }
 
+    /// <summary>The endpoint's app sessions.</summary>
+    public static IAudioSessionManager2 ActivateSessions(IMMDevice device)
+    {
+        var interfaceId = typeof(IAudioSessionManager2).GUID;
+        return (IAudioSessionManager2)device.Activate(ref interfaceId, ClassContextAll, 0);
+    }
+
     /// <summary>The name Windows shows for the device.</summary>
     public static string FriendlyName(IMMDevice device)
     {

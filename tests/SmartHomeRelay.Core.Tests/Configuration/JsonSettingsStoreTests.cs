@@ -46,7 +46,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
             ignoreOrder: false);
         PropertyNames(root.GetProperty("device")).ShouldBe(["id", "name"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features")).ShouldBe(
-            ["presence", "power", "display", "audio", "metrics", "notifications", "hardware"],
+            ["presence", "power", "display", "audio", "metrics", "notifications", "hardware", "mediaPlayer"],
             ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("presence")).ShouldBe(["enabled", "idleThresholdSeconds"], ignoreOrder: true);
         PropertyNames(root.GetProperty("features").GetProperty("power")).ShouldBe(
@@ -61,6 +61,9 @@ public sealed class JsonSettingsStoreTests : IDisposable
             ignoreOrder: false);
         root.GetProperty("features").GetProperty("hardware").GetProperty("sensors").EnumerateArray().Select(e => e.GetString())
             .ShouldBe(["cpu_temperature", "cpu_fan", "ssd_temperature"]);
+        PropertyNames(root.GetProperty("features").GetProperty("mediaPlayer")).ShouldBe(
+            ["enabled", "interruption", "duckLevelPercent", "maxDownloadBytes", "downloadTimeoutSeconds", "positionIntervalSeconds"],
+            ignoreOrder: false);
         root.GetProperty("logLevel").GetString().ShouldBe("Information");
     }
 

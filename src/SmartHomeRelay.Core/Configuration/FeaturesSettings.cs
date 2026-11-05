@@ -23,4 +23,7 @@ public sealed class FeaturesSettings
 
     /// <summary>Hardware sensors from LibreHardwareMonitor (spec 5.8). Off by default.</summary>
     public HardwareSettings Hardware { get; set; } = new();
+
+    /// <summary>The PC as a media player through the MQTT Media Player add-on (spec 5.9). Off by default.</summary>
+    public MediaPlayerSettings MediaPlayer { get; set; } = new();
 }

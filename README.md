@@ -18,7 +18,8 @@ It runs as a standard user and never asks for administrator rights.
 | Hardware sensors (optional) | CPU temperature, CPU fan, SSD temperature, from a [LibreHardwareMonitor you install](docs/hardware-sensors.md) | [5.8](spec.md#58-hardware-sensors-librehardwaremonitor--milestone-6) |
 | Display | Monitor off, monitor on | [5.3](spec.md#53-display) |
 | Audio | Volume (slider), mute, microphone mute, output device picker | [5.4](spec.md#54-audio) |
-| Media player, Notifications | Planned (milestones 8 and 9). The media player needs the [MQTT Media Player](https://github.com/bkbilly/mqtt_media_player) add-on from HACS | [5.9](spec.md#59-media-player-via-the-mqtt-media-player-add-on--milestone-8), [5.6](spec.md#56-notifications) |
+| Media player (optional) | A `media_player` that mirrors what Windows' media controls show, with play/pause, next, previous, seek, volume and mute, and plays text-to-speech and media from Home Assistant over your music (other apps are lowered meanwhile). Needs the [MQTT Media Player add-on](docs/media-player.md) from HACS | [5.9](spec.md#59-media-player-via-the-mqtt-media-player-add-on--milestone-8) |
+| Notifications | Planned (milestone 9) | [5.6](spec.md#56-notifications) |
 
 Shutdown, restart, hibernate and sign out are off until you allow them in `settings.json`.
 
@@ -36,7 +37,7 @@ Shutdown, restart, hibernate and sign out are off until you allow them in `setti
 
 The tray icon shows the connection state. Its menu has **Status**, **Settings** (opens `settings.json`), **Reconnect**, **Open logs folder** and **Exit**. A settings window and an installer come in milestone 10.
 
-Optional: [hardware sensors with LibreHardwareMonitor](docs/hardware-sensors.md) (CPU temperature, fans).
+Optional: [hardware sensors with LibreHardwareMonitor](docs/hardware-sensors.md) (CPU temperature, fans) and the [media player](docs/media-player.md) (text-to-speech and media on the PC).
 
 ## Building and testing
 
@@ -56,4 +57,5 @@ dotnet test SmartHomeRelay.sln --filter "Category=MqttBroker"
 - [spec.md](spec.md): the source of truth for behavior, topics, settings and milestones
 - [AGENTS.md](AGENTS.md): rules for contributors and AI coding agents
 - [docs/hardware-sensors.md](docs/hardware-sensors.md): installing LibreHardwareMonitor for hardware sensors
+- [docs/media-player.md](docs/media-player.md): installing the MQTT Media Player add-on for the media player
 - `tools/probe-sensors.ps1`: lists which temperature and power sources a PC exposes to a standard user
