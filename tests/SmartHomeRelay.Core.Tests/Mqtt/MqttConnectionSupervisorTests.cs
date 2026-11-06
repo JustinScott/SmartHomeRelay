@@ -33,6 +33,17 @@ public sealed class MqttConnectionSupervisorTests : IAsyncDisposable
     public async ValueTask DisposeAsync() => await _supervisor.DisposeAsync();
 
     [Fact]
+    public async Task DisposeAsync_Twice_DoesNotThrow()
+    {
+        // The container disposes the supervisor once per service it's registered as (regression: crashed at exit).
+        await StartAndWaitForStatusAsync(RelayStatus.Connected);
+
+        await _supervisor.DisposeAsync();
+        await Should.NotThrowAsync(async () => await _supervisor.DisposeAsync());
+        Should.NotThrow(_supervisor.Dispose);
+    }
+
+    [Fact]
     public async Task Start_Configured_ConnectsWithRetainedOfflineLastWill()
     {
         await StartAndWaitForStatusAsync(RelayStatus.Connected);

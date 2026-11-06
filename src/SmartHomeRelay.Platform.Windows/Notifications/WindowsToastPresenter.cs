@@ -90,13 +90,28 @@ public sealed partial class WindowsToastPresenter : IToastPresenter
         {
             ToastAppRegistration.Register(_identity);
             _notifier = ToastNotificationManager.CreateToastNotifier(_identity.AppUserModelId);
-            if (_notifier.Setting != NotificationSetting.Enabled)
-            {
-                LogNotificationsOff(_logger, _notifier.Setting.ToString());
-            }
+            LogIfNotificationsOff(_notifier);
         }
 
         return _notifier;
+    }
+
+    /// <summary>
+    /// Diagnostics only. For an app registered without a Start Menu shortcut, Windows can't answer and throws
+    /// <c>E_NOTFOUND</c> (seen on BOX1); that must never stop the toast from being shown.
+    /// </summary>
+    private void LogIfNotificationsOff(ToastNotifier notifier)
+    {
+        try
+        {
+            if (notifier.Setting != NotificationSetting.Enabled)
+            {
+                LogNotificationsOff(_logger, notifier.Setting.ToString());
+            }
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+        }
     }
 
     private void OnActivated(ToastNotification sender, object args)

@@ -28,6 +28,7 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     private readonly ILogger<MqttConnectionSupervisor> _logger;
     private readonly Channel<bool> _wake = Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
     private readonly CancellationTokenSource _stopping = new();
+    private int _disposed;
     private TaskCompletionSource _disconnected = NewSignal();
     private string _activeFingerprint = string.Empty;
     private MqttTopics? _connectedTopics;
@@ -142,11 +143,25 @@ public sealed partial class MqttConnectionSupervisor : IHostedService, IRelaySta
     /// Synchronous dispose (e.g. a container disposed with Dispose): stops the loop without waiting.
     /// Normal shutdown goes through <see cref="StopAsync"/>, which publishes offline first.
     /// </summary>
-    public void Dispose() => _stopping.Cancel();
+    public void Dispose()
+    {
+        if (Volatile.Read(ref _disposed) == 0)
+        {
+            _stopping.Cancel();
+        }
+    }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Stops the loop and releases it. Safe to call more than once: the container disposes this instance once for
+    /// each service it is registered as (regression: a second call threw at every app exit).
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+        {
+            return;
+        }
+
         await _stopping.CancelAsync().ConfigureAwait(false);
         if (_loop is not null)
         {
