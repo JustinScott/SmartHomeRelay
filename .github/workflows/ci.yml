@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    # A version tag (v1.0.0) also publishes a GitHub Release with the installer (spec 8).
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -49,6 +51,59 @@ jobs:
         with:
           name: SmartHomeRelay-win-x64
           path: publish
+
+      # The version is defined once, in Directory.Build.props (spec 8).
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Select-Xml -Path Directory.Build.props -XPath '//Version').Node.InnerText
+          "value=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version $version"
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
+          & $iscc /Qp "/DAppVersion=${{ steps.version.outputs.value }}" "/DSourceDir=..\publish" installer\SmartHomeRelay.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: SmartHomeRelay-installer
+          path: installer/output/*.exe
+          if-no-files-found: error
+
+  # On a version tag: check it matches Directory.Build.props, then publish a Release with the installer.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, mqtt-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the tag matches the version
+        run: |
+          version=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match version $version in Directory.Build.props." >&2
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: SmartHomeRelay-installer
+          path: dist
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.exe --title "Smart Home Relay ${GITHUB_REF_NAME#v}" --generate-notes
 
   # Windows runners cannot run Linux containers, so the real-broker tests run here (spec 9).
   # Core is cross-platform, so its tests run unchanged on Linux.
