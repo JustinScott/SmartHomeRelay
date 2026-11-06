@@ -38,7 +38,7 @@ public sealed class SettingsFileInitializerTests : IDisposable
         using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(_paths.SettingsFilePath, TestContext.Current.CancellationToken));
         document.RootElement.GetProperty("mqtt").GetProperty("host").GetString().ShouldBe("broker.local");
         document.RootElement.GetProperty("mqtt").GetProperty("port").GetInt32().ShouldBe(1884);
-        context.Shell.OpenedFiles.ShouldBeEmpty("the welcome flow is for first run only");
+        context.Window.Opened.ShouldBe(0, "the welcome flow is for first run only");
     }
 
     [Fact]
@@ -55,13 +55,13 @@ public sealed class SettingsFileInitializerTests : IDisposable
     }
 
     [Fact]
-    public async Task StartHostedServices_NoFile_OpensFileAndShowsWelcome()
+    public async Task StartHostedServices_NoFile_OpensTheSettingsWindowAndShowsWelcome()
     {
         using var context = new SettingsTestContext(_paths);
 
         await StartAllAsync(context);
 
-        context.Shell.OpenedFiles.ShouldBe([_paths.SettingsFilePath]);
+        context.Window.Opened.ShouldBe(1);
         context.Notifier.Notifications.Count.ShouldBe(1);
         context.Notifier.Notifications[0].Title.ShouldBe(SettingsFileInitializer.WelcomeTitle);
     }
@@ -74,7 +74,7 @@ public sealed class SettingsFileInitializerTests : IDisposable
 
         await StartAllAsync(context);
 
-        context.Shell.OpenedFiles.ShouldBeEmpty();
+        context.Window.Opened.ShouldBe(0);
         context.Notifier.Notifications.ShouldBeEmpty();
     }
 

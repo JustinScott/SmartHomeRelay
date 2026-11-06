@@ -25,7 +25,7 @@ internal sealed class SettingsTestContext : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<IAppPaths>(paths);
         services.AddSingleton<IHostNameProvider>(new FakeHostNameProvider(HostName));
-        services.AddSingleton<IShellLauncher>(Shell);
+        services.AddSingleton<ISettingsWindow>(Window);
         services.AddSingleton<IUserNotifier>(Notifier);
         services.AddSingleton<ISecretProtector>(new FakeSecretProtector());
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
@@ -35,7 +35,7 @@ internal sealed class SettingsTestContext : IDisposable
 
     public TempAppPaths Paths { get; }
 
-    public FakeShellLauncher Shell { get; } = new();
+    public FakeSettingsWindow Window { get; } = new();
 
     public FakeUserNotifier Notifier { get; } = new();
 

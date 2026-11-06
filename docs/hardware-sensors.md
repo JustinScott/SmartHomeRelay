@@ -98,7 +98,9 @@ Windows Firewall doesn't filter traffic within the same PC (loopback), so Smart 
 
 ## 6. Turn on the Hardware feature in Smart Home Relay
 
-Open `settings.json` (tray menu → **Settings**). Smart Home Relay adds the `hardware` section under `features` the first time it starts after an update, turned off; if you don't see it, restart Smart Home Relay (a file with comments is left as is, so add the section by hand in that case). Then set:
+Open the settings window (tray menu → **Settings**), go to **Features → Hardware sensors**, turn it on, and enter the port, the LHM user name and password, and how often to read. Save.
+
+The sensor list and overrides are only in `settings.json` (**General → Open settings.json**). Smart Home Relay adds the `hardware` section under `features` the first time it starts after an update, turned off; if you don't see it, restart Smart Home Relay (a file with comments is left as is, so add the section by hand in that case). In the file it looks like this:
 
 ```json
 "hardware": {

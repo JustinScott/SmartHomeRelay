@@ -528,8 +528,8 @@ Notes:
 - File: `%APPDATA%\SmartHomeRelay\settings.json`. Created with defaults on first run.
 - Bound via the Options pattern; validated on load and on save (invalid values rejected with clear messages in the UI).
 - **MQTT password** is stored encrypted using DPAPI (`ProtectedData`, `CurrentUser` scope). Never logged. The app never writes it in plain text.
-- **Entering the password by hand:** the file always contains an empty `"password": ""` field right after `username`, so the user can see where to type (milestone 2 finding: without it, the password was typed into `passwordProtected`, which only holds encrypted values). The user types the password there. When the app loads the file it encrypts the value into `passwordProtected` and rewrites the file without the plain-text field, so plain text exists only between the user saving and the app picking up the change. This is how the password is set until the settings window exists (milestone 10).
-- **First run:** when the app creates `settings.json`, it opens the file in the user's default editor for `.json` files (Notepad if there is none) and shows a tray balloon explaining what to fill in. Saved changes are applied without a restart.
+- **Entering the password by hand:** the file always contains an empty `"password": ""` field right after `username`, so the user can see where to type (milestone 2 finding: without it, the password was typed into `passwordProtected`, which only holds encrypted values). The user types the password there. When the app loads the file it encrypts the value into `passwordProtected` and rewrites the file without the plain-text field, so plain text exists only between the user saving and the app picking up the change. Since milestone 10 the settings window is the usual way to set it; typing it into the file still works.
+- **First run:** when the app creates `settings.json`, it opens the settings window (milestone 10; before that it opened the file in the default editor) and shows a tray balloon explaining what to fill in. Saved changes are applied without a restart.
 
 ```json
 {
@@ -568,21 +568,22 @@ Notes:
 ### 7.1 Settings window (WinForms)
 
 - Tabs or sections: **Connection** (host, port, username, password, **Test connection** button), **Device** (name, ID), **Features** (toggles and per-feature options), **General** (start with Windows, log level).
-- The form is a thin view. A `SettingsPresenter` (in `App/Settings/`, depending only on abstractions) holds validation and save logic and is unit-testable.
-- Tray menu: status (connected / disconnected), Settings, Reconnect, Pause/Resume reporting, Open logs folder, Exit. Items are added in the milestone that implements them; the menu never shows placeholder items. Until the settings window exists (milestone 10), **Settings** opens `settings.json` in the default editor. **Reconnect** publishes `offline`, disconnects, and connects again immediately.
+- The form (`App/Settings/SettingsForm`, WinForms built in code) is a thin view. Its logic is `Core/Configuration/SettingsEditor` (decided in milestone 10: in Core rather than `App/Settings/SettingsPresenter`, so it is tested on any OS): an editable copy of the settings in effect, newly typed passwords encrypted (an empty box keeps the saved one; plain text is never written), validation with the same `SettingsValidator`, and save through `ISettingsStore`. The running app picks the saved file up like any other change.
+- **Scope (decided in milestone 10): everyday settings in the window**, the rest in the file. Connection: address, port, user name, password, **Test connection** (`Core/Mqtt/MqttConnectionTester`: a separate short connection with client ID `shr-{deviceId}-test`, closed cleanly, so the real connection is untouched; messages never contain the password). Device: name and ID, with a warning that changing the ID makes HA see a new device. Features: every feature's on/off and its everyday options (presence idle time; power permissions and delay; metrics interval; media player interruption, duck level and speaking notice; hardware port, login and interval). General: start with Windows, log level, **Open settings.json**, **Open logs folder**. Only in the file: MQTT discovery prefix and base topic, download and image limits, position interval, the hardware sensor list and overrides. Saving rewrites the file, so comments are lost (the General tab says so). If the file has problems, the window shows them and saving replaces it with valid settings. Double-clicking the tray icon also opens the window; a second open brings the existing window to the front.
+- Tray menu: status (connected / disconnected), Settings, Reconnect, Pause/Resume reporting, Open logs folder, Exit. Items are added in the milestone that implements them; the menu never shows placeholder items. **Settings** opens the settings window (before milestone 10 it opened `settings.json`). **Reconnect** publishes `offline`, disconnects, and connects again immediately.
 - Launching the app while it is already running: the running copy shows a tray balloon ("Smart Home Relay is already running") and the new process exits.
-- "Start with Windows" toggles the per-user `Run` registry value, the same one the installer creates.
+- "Start with Windows" is the per-user `Run` value `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SmartHomeRelay`, pointing at the running exe. The setting is the source of truth (decided in milestone 10): the app applies it at start and whenever valid settings change, and the installer doesn't create the value. It is only changed when the app runs from its installed folder, so a development build never takes over sign-in.
 
 ---
 
 ## 8. Installation, Startup, and Updates
 
 - **Installer:** Inno Setup script in `installer/`. Per-user install to `%LOCALAPPDATA%\Programs\SmartHomeRelay` (no admin prompt).
-- Installer creates a Start Menu shortcut (with the App User Model ID `SmartHomeRelay.App` for toast support) and, optionally, the `HKCU\...\Run` startup entry. Uninstall removes the app's `HKCU\Software\Classes\AppUserModelId\SmartHomeRelay.App` key.
+- **Installer (`installer/SmartHomeRelay.iss`, milestone 10):** Start Menu shortcut with the App User Model ID `SmartHomeRelay.App` (toast support); no directory or Start Menu folder pages; offers to start the app at the end. The `Run` value comes from the app's start-with-Windows setting (default on), not from an installer checkbox. Uninstall stops this user's running copy, removes the `Run` value, the `HKCU\Software\Classes\AppUserModelId\SmartHomeRelay.App` key, and the cache folder; settings (`%APPDATA%`) and logs are kept. The installer is not code-signed, so SmartScreen may warn on first run.
 - **Publish mode:** self-contained `win-x64` only (no ARM64 or x86 builds; no .NET runtime required on the target PC). Single-file publishing is optional.
 - **Upgrades (v1):** running a newer installer upgrades in place; the app is closed first (installer uses a `CloseApplications` mechanism). Settings in `%APPDATA%` are preserved.
 - Version is defined once in `Directory.Build.props` and flows to the assembly, installer, and HA `sw_version`.
-- **Manual updates only.** CI attaches the installer to a GitHub Release; updating means downloading and running the newer installer. Auto-update is out of scope (if wanted later, evaluate Velopack).
+- **Manual updates only.** Every CI run builds the installer (Inno Setup 6 on the Windows runner) as an artifact; pushing a tag `v{version}` that matches `Directory.Build.props` also creates a GitHub Release with it (the release job refuses a mismatched tag). Updating means downloading and running the newer installer. First release: 1.0.0. Auto-update is out of scope (if wanted later, evaluate Velopack).
 
 ---
 
@@ -691,7 +692,7 @@ Conventions:
 7. **Display** and **Audio** modules (including `mic_muted` and the `output_device` select).
 8. **Media player** via the MQTT Media Player add-on (5.9), with custom discovery (3.3) and ducking.
 9. **Notifications** module, including the media player's "Home Assistant is speaking" notice (5.6).
-10. **Settings window** polish and installer.
+10. **Settings window** polish and installer (version 1.0.0).
 
 ---
 
@@ -733,6 +734,7 @@ Conventions:
 - Verified on BOX1 (milestone 8, add-on 2026.10.1 on HA 2026.11.0): the player mirrors the Windows media session (a browser video's title and type); play/pause, next, previous and seek work from HA; volume and mute stay in sync both ways with the Audio entities; TTS plays with `interruption` `duck` and `pause`; a second message replaces the first and the duck holds; changing the master volume during TTS works; files from the media browser play (a WAV and an MP3 from local media; video files are refused as not audio, by design); turning the feature off shows the player as Off; tests pass on BOX1 and in CI. The player is its own "BOX1 Media Player" device, listed under BOX1's connected devices (`via_device`). With the add-on patched locally (MQTT discovery topic in its manifest; `via_device` resolved as an MQTT identifier), it is discovered with no `configuration.yaml` line; both fixes go upstream as pull requests.
 - Verified on BOX1 (milestone 9 complete): `notify.send_message` on the notify entity shows a toast; `mqtt.publish` JSON with a hero image, buttons and `ActivationURL` works (image shown, buttons and click open their URLs). The notify entity is used through `notify.send_message` with the entity as target; HA creates no per-entity `notify.<name>` action for it (those belong to legacy notify services), as expected.
 - Verified on BOX1 (milestone 9, speaking notice): it pops up during TTS, stays on screen for the whole message, Stop ends the audio, and it shows even with Do Not Disturb on. Found and fixed on BOX1: reading `ToastNotifier.Setting` throws `E_NOTFOUND` for an app registered without a shortcut, which had stopped the first toast; and a crash at every exit from the MQTT supervisor being disposed twice.
+- Milestone 10 decisions: the window covers everyday settings and links to settings.json for the rest; Pause/Resume reporting stays unassigned; installers are released on a version tag, starting at 1.0.0; the settings logic lives in Core (`SettingsEditor`); start with Windows is applied by the app (only when installed), not the installer; first run opens the window instead of the file.
 - Milestone 9 decisions: toasts through Windows' built-in API (no package); the app registers its own toast identity under HKCU until the installer exists; a `notify` entity on the notification topic, with plain-text payloads shown as the message.
 - Milestone 8 decisions: custom component topics use the component name (`media_player`), not the module ID; the module has no ordinary entities; while disabled it also clears duration and position; downloads share `Core/Net/LimitedHttpDownloader`, which notifications (milestone 9) can reuse.
 - Audio additions (decided before milestone 7): `mic_muted` switch (show and change the default mic's mute) and `output_device` as a `select` to change the default output device.
@@ -743,6 +745,7 @@ Conventions:
 **Open**
 
 - [x] MQTT Media Player add-on installed on HA for milestone 8: version 2026.10.1, reviewed (5.9).
+- [ ] Verify milestone 10 on BOX1: the installer from CI installs without an admin prompt; first start opens the window; Test connection, Save (including a new password) and the feature options apply live; start with Windows creates and removes the Run value; upgrading over it keeps settings; uninstall removes the shortcut, Run value and toast key; tagging v1.0.0 publishes the release.
 - [ ] Media player recovery (5.9): close the app, or sleep the PC, during a long announcement; the ducked apps must get their level back on the next start or wake.
 - [ ] Media player: change one app's level in Windows' volume mixer during an announcement; it must stay where the user put it after the restore (only the master volume was tested).
 - [ ] Upstream pull requests to bkbilly/mqtt_media_player: MQTT discovery without a YAML entry, and `via_device`. Once released, move the tested version and drop the `configuration.yaml` step from `docs/media-player.md`.

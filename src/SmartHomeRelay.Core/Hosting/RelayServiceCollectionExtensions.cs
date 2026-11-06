@@ -17,6 +17,9 @@ public static class RelayServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IMqttTransport, MqttNetTransport>();
+
+        // The settings window's Test connection uses its own short-lived transport (spec 7.1).
+        services.AddSingleton(sp => new MqttConnectionTester(() => new MqttNetTransport(), sp.GetRequiredService<Abstractions.ISecretProtector>()));
         services.AddSingleton(_ => new ReconnectBackoff(new Random()));
 
         services.AddSingleton<ModuleHost>();

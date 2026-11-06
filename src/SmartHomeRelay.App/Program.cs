@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Serilog.Core;
 using Serilog.Extensions.Logging;
 using SmartHomeRelay.App.Logging;
+using SmartHomeRelay.App.Settings;
 using SmartHomeRelay.App.Tray;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
@@ -68,6 +69,14 @@ internal static class Program
         builder.Services.AddHostedService<LogLevelSynchronizer>();
         builder.Services.AddRelayMqtt();
         builder.Services.AddSingleton<TrayApplicationContext>();
+
+        // Settings window and start with Windows (spec 7.1)
+        builder.Services.AddSingleton<SettingsWindowOpener>();
+        builder.Services.AddSingleton<ISettingsWindow>(sp => sp.GetRequiredService<SettingsWindowOpener>());
+        builder.Services.AddTransient<SettingsForm>();
+        builder.Services.AddSingleton<Func<SettingsForm>>(sp => () => sp.GetRequiredService<SettingsForm>());
+        builder.Services.AddSingleton<IStartupRegistration, WindowsStartupRegistration>();
+        builder.Services.AddHostedService<StartWithWindowsSynchronizer>();
 
         // Feature modules (spec 13): the module plus its platform implementations.
         // Presence (spec 5.1)

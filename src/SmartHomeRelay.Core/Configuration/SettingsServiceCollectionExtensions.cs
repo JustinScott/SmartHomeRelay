@@ -11,7 +11,7 @@ public static class SettingsServiceCollectionExtensions
     /// Binds <see cref="AppSettings"/> to <paramref name="configuration"/> and registers validation,
     /// the store, <see cref="ISettingsState"/>, and first-run file creation.
     /// Requires the platform's <see cref="Abstractions.IHostNameProvider"/>, <see cref="Abstractions.IAppPaths"/>,
-    /// <see cref="Abstractions.IShellLauncher"/>, <see cref="Abstractions.IUserNotifier"/>, and
+    /// <see cref="Abstractions.ISettingsWindow"/>, <see cref="Abstractions.IUserNotifier"/>, and
     /// <see cref="Abstractions.ISecretProtector"/>.
     /// </summary>
     public static IServiceCollection AddRelaySettings(this IServiceCollection services, IConfiguration configuration)
@@ -24,6 +24,7 @@ public static class SettingsServiceCollectionExtensions
         services.AddSingleton<IPostConfigureOptions<AppSettings>>(sp => sp.GetRequiredService<DeviceDefaultsPostConfigure>());
         services.AddSingleton<SettingsValidator>();
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
+        services.AddSingleton<SettingsEditor>();
         services.AddSingleton<SettingsState>();
         services.AddSingleton<ISettingsState>(sp => sp.GetRequiredService<SettingsState>());
 

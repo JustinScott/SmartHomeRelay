@@ -6,7 +6,7 @@ A Windows tray app that connects a PC to [Home Assistant](https://www.home-assis
 
 It runs as a standard user and never asks for administrator rights.
 
-> **Status:** in development, built milestone by milestone ([spec section 14](spec.md#14-milestones)). No release yet.
+> **Status:** version 1.0.0, all v1 milestones built ([spec section 14](spec.md#14-milestones)). Installers are on the [Releases page](https://github.com/JustinScott/SmartHomeRelay/releases).
 
 ## What it does
 
@@ -21,7 +21,7 @@ It runs as a standard user and never asks for administrator rights.
 | Media player (optional) | A `media_player` that mirrors what Windows' media controls show, with play/pause, next, previous, seek, volume and mute, and plays text-to-speech and media from Home Assistant over your music (other apps are lowered meanwhile). Needs the [MQTT Media Player add-on](docs/media-player.md) from HACS | [5.9](spec.md#59-media-player-via-the-mqtt-media-player-add-on--milestone-8) |
 | Notifications | Windows notifications from Home Assistant: a `notify` entity for `notify.send_message`, or JSON with a title, image, click link and up to 5 buttons ([how to send them](docs/notifications.md)) | [5.6](spec.md#56-notifications) |
 
-Shutdown, restart, hibernate and sign out are off until you allow them in `settings.json`.
+Shutdown, restart, hibernate and sign out are off until you allow them in the settings window (**Features → Power**).
 
 ## Requirements
 
@@ -31,11 +31,13 @@ Shutdown, restart, hibernate and sign out are off until you allow them in `setti
 
 ## Setup
 
-1. Run `SmartHomeRelay.App.exe`. On first run it creates `%APPDATA%\SmartHomeRelay\settings.json` and opens it.
-2. Fill in `mqtt.host`, `mqtt.username` and `mqtt.password`, then save. The password is encrypted for your Windows account (DPAPI) and removed from the file as soon as the app reads it.
+1. Download `SmartHomeRelay-<version>-setup.exe` from the [latest release](https://github.com/JustinScott/SmartHomeRelay/releases/latest) and run it. It installs for your Windows account only (to `%LOCALAPPDATA%\Programs\SmartHomeRelay`), so it never asks for administrator rights. The installer isn't code-signed, so Windows SmartScreen may warn the first time: choose **More info → Run anyway**.
+2. On first start the settings window opens. On **Connection**, enter the broker's address, user name and password, click **Test connection**, then **Save**. The password is encrypted for your Windows account (DPAPI).
 3. The PC appears in Home Assistant under **Settings → Devices & services → MQTT**.
 
-The tray icon shows the connection state. Its menu has **Status**, **Settings** (opens `settings.json`), **Reconnect**, **Open logs folder** and **Exit**. A settings window and an installer come in milestone 10.
+The tray icon shows the connection state. Its menu has **Status**, **Settings** (or double-click the icon), **Reconnect**, **Open logs folder** and **Exit**. Smart Home Relay starts when you sign in; turn that off under **General** in the settings window. Rare options (MQTT topics, download limits, the hardware sensor list) are in `%APPDATA%\SmartHomeRelay\settings.json`; **General → Open settings.json** opens it.
+
+**Upgrading:** run the newer installer; it closes the app, keeps your settings, and you start it again from the last page. **Uninstalling:** Settings → Apps in Windows. Your settings and logs are kept (delete `%APPDATA%\SmartHomeRelay` and `%LOCALAPPDATA%\SmartHomeRelay` to remove them too).
 
 Optional: [hardware sensors with LibreHardwareMonitor](docs/hardware-sensors.md) (CPU temperature, fans) and the [media player](docs/media-player.md) (text-to-speech and media on the PC).
 
@@ -51,6 +53,19 @@ dotnet test SmartHomeRelay.sln --filter "Category=MqttBroker"
 1. Fast unit tests. They run on any OS.
 2. Adds the Windows-only integration tests.
 3. Needs a Mosquitto broker. `tests/brokers/start-test-brokers.sh` starts the two test brokers on Linux; CI runs these in a Linux job.
+
+## Releasing
+
+1. Set the new version in `Directory.Build.props` (it flows to the app, the installer and Home Assistant's software version) and commit.
+2. Tag the commit and push the tag: `git tag v1.0.1` then `git push origin v1.0.1`.
+3. CI builds and tests as usual, then publishes a GitHub Release with the installer. It refuses a tag that doesn't match the version.
+
+Every CI run also uploads the installer as an artifact. To build it locally: install [Inno Setup 6](https://jrsoftware.org/isinfo.php), then
+
+```
+dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj -c Release -r win-x64 --self-contained -o publish
+"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 installer\SmartHomeRelay.iss
+```
 
 ## Documentation
 

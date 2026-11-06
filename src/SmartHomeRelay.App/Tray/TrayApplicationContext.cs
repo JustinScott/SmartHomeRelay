@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using SmartHomeRelay.App.Settings;
 using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Core.Mqtt;
@@ -21,12 +22,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly IAppPaths _paths;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly TrayNotifier _notifier;
+    private readonly SettingsWindowOpener _settingsOpener;
+    private readonly Func<SettingsForm> _createSettingsForm;
     private readonly SynchronizationContext _uiContext;
     private readonly CancellationTokenRegistration _stoppingRegistration;
     private readonly Dictionary<StatusSeverity, Icon> _icons;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
     private readonly NotifyIcon _notifyIcon;
+    private SettingsForm? _settingsForm;
 
     public TrayApplicationContext(
         IRelayStatusSource status,
@@ -35,8 +39,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         IShellLauncher shell,
         IAppPaths paths,
         IHostApplicationLifetime lifetime,
-        TrayNotifier notifier)
+        TrayNotifier notifier,
+        SettingsWindowOpener settingsOpener,
+        Func<SettingsForm> createSettingsForm)
     {
+        _settingsOpener = settingsOpener;
+        _createSettingsForm = createSettingsForm;
         _status = status;
         _reconnect = reconnect;
         _singleInstance = singleInstance;
@@ -54,8 +62,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _menu.Items.Add(_statusItem);
         _menu.Items.Add(new ToolStripSeparator());
 
-        // Until the settings window exists (milestone 10), Settings opens settings.json (spec 7).
-        _menu.Items.Add("Settings", null, (_, _) => _shell.OpenFile(_paths.SettingsFilePath));
+        _menu.Items.Add("Settings", null, (_, _) => OpenSettings());
         _menu.Items.Add("Reconnect", null, (_, _) => _reconnect.RequestReconnect());
         _menu.Items.Add("Open logs folder", null, (_, _) => _shell.OpenFolder(_paths.LogsDirectory));
         _menu.Items.Add(new ToolStripSeparator());
@@ -72,6 +79,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _status.StatusChanged += OnStatusChanged;
         _singleInstance.SecondInstanceStarted += OnSecondInstanceStarted;
         _notifier.Attach((title, message) => _uiContext.Post(_ => ShowBalloon(title, message), null));
+        _settingsOpener.Attach(() => _uiContext.Post(_ => OpenSettings(), null));
+        _notifyIcon.DoubleClick += (_, _) => OpenSettings();
         _stoppingRegistration = _lifetime.ApplicationStopping.Register(() => _uiContext.Post(_ => ExitThread(), null));
     }
 
@@ -87,6 +96,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (disposing)
         {
             _notifier.Detach();
+            _settingsOpener.Detach();
+            _settingsForm?.Dispose();
             _status.StatusChanged -= OnStatusChanged;
             _singleInstance.SecondInstanceStarted -= OnSecondInstanceStarted;
             _stoppingRegistration.Dispose();
@@ -100,6 +111,31 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         base.Dispose(disposing);
+    }
+
+    /// <summary>Shows the settings window, or brings the open one to the front. UI thread only.</summary>
+    private void OpenSettings()
+    {
+        if (_settingsForm is { IsDisposed: false } open)
+        {
+            if (open.WindowState == FormWindowState.Minimized)
+            {
+                open.WindowState = FormWindowState.Normal;
+            }
+
+            open.Activate();
+            return;
+        }
+
+        var form = _createSettingsForm();
+        form.FormClosed += (_, _) =>
+        {
+            form.Dispose();
+            _settingsForm = null;
+        };
+        _settingsForm = form;
+        form.Show();
+        form.Activate();
     }
 
     private void OnStatusChanged(object? sender, EventArgs e) => _uiContext.Post(_ => UpdateStatus(), null);

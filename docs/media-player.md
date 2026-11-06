@@ -53,7 +53,9 @@ If that address is `https` with a certificate Windows doesn't trust (self-signed
 
 ## 3. Turn on the media player in Smart Home Relay
 
-Open `settings.json` (tray menu → **Settings**). The `mediaPlayer` section under `features` is added automatically, turned off. Set `enabled` to `true` and save. It starts right away; no restart needed.
+Open the settings window (tray menu → **Settings**), go to **Features → Media player**, turn it on, and save. It starts right away; no restart needed.
+
+The download limits are only in `settings.json` (**General → Open settings.json**), in the `mediaPlayer` section under `features`:
 
 ```json
 "mediaPlayer": {

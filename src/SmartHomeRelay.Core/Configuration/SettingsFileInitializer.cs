@@ -5,23 +5,23 @@ using SmartHomeRelay.Core.Abstractions;
 namespace SmartHomeRelay.Core.Configuration;
 
 /// <summary>
-/// First run (spec 7): creates <c>settings.json</c> with defaults, opens it for editing, and tells the
-/// user what to fill in. The device ID written is the current host name, which pins it so a later host
+/// First run (spec 7): creates <c>settings.json</c> with defaults, opens the settings window (milestone 10;
+/// before that it opened the file), and tells the user what to fill in. The device ID written is the current host name, which pins it so a later host
 /// name change doesn't create new HA entities. An existing file is never overwritten.
 /// </summary>
 public sealed partial class SettingsFileInitializer(
     ISettingsStore store,
     ISettingsState state,
     IAppPaths paths,
-    IShellLauncher shell,
+    ISettingsWindow window,
     IUserNotifier notifier,
     ILogger<SettingsFileInitializer> logger) : IHostedService
 {
     internal const string WelcomeTitle = "Welcome to Smart Home Relay";
 
     internal const string WelcomeMessage =
-        "Fill in host, username, and password under \"mqtt\" in settings.json, then save. " +
-        "The password is encrypted automatically and the app connects on its own.";
+        "Enter your MQTT broker's address, user name, and password, then save. " +
+        "The app connects on its own.";
 
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -46,12 +46,12 @@ public sealed partial class SettingsFileInitializer(
         notifier.Notify(WelcomeTitle, WelcomeMessage);
         try
         {
-            shell.OpenFile(paths.SettingsFilePath);
+            window.Open();
         }
         catch (Exception ex)
         {
-            // The balloon still tells the user where to look; the tray's Settings item opens it too.
-            LogOpenFailed(logger, ex, paths.SettingsFilePath);
+            // The balloon still tells the user what to do; the tray's Settings item opens the window too.
+            LogOpenFailed(logger, ex);
         }
     }
 
@@ -64,6 +64,6 @@ public sealed partial class SettingsFileInitializer(
     [LoggerMessage(Level = LogLevel.Error, Message = "Could not create the settings file at {Path}")]
     private static partial void LogCreateFailed(ILogger logger, Exception exception, string path);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not open {Path} for editing")]
-    private static partial void LogOpenFailed(ILogger logger, Exception exception, string path);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not open the settings window")]
+    private static partial void LogOpenFailed(ILogger logger, Exception exception);
 }

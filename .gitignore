@@ -23,3 +23,4 @@ settings.json
 
 # Snapshot test output awaiting review
 *.received.json
+installer/output/

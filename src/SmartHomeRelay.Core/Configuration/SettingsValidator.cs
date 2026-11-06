@@ -8,20 +8,44 @@ namespace SmartHomeRelay.Core.Configuration;
 /// </summary>
 public sealed class SettingsValidator
 {
-    internal const int MinIdleThresholdSeconds = 10;
-    internal const int MaxIdleThresholdSeconds = 86_400;
-    internal const int MinMetricsIntervalSeconds = 5;
-    internal const int MaxMetricsIntervalSeconds = 3_600;
-    internal const int MinImageTimeoutSeconds = 1;
-    internal const int MaxImageTimeoutSeconds = 120;
-    internal const long MaxImageMaxBytes = 100L * 1024 * 1024;
-    internal const int MaxShutdownDelaySeconds = 600;
-    internal const int MinHardwareIntervalSeconds = 5;
-    internal const int MaxHardwareIntervalSeconds = 3_600;
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MinIdleThresholdSeconds = 10;
 
-    internal const long MaxMediaDownloadBytes = 200L * 1024 * 1024;
-    internal const int MaxMediaDownloadTimeoutSeconds = 300;
-    internal const int MaxPositionIntervalSeconds = 300;
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxIdleThresholdSeconds = 86_400;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MinMetricsIntervalSeconds = 5;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxMetricsIntervalSeconds = 3_600;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MinImageTimeoutSeconds = 1;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxImageTimeoutSeconds = 120;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const long MaxImageMaxBytes = 100L * 1024 * 1024;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxShutdownDelaySeconds = 600;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MinHardwareIntervalSeconds = 5;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxHardwareIntervalSeconds = 3_600;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const long MaxMediaDownloadBytes = 200L * 1024 * 1024;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxMediaDownloadTimeoutSeconds = 300;
+
+    /// <summary>A limit used in validation and by the settings window.</summary>
+    public const int MaxPositionIntervalSeconds = 300;
 
     private static readonly char[] s_topicWildcards = ['+', '#'];
 

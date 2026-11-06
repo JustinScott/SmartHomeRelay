@@ -2,7 +2,7 @@
   <!-- Shared settings for every project. Version is defined once here and flows to
        assemblies, the installer, and the Home Assistant sw_version (spec 8). -->
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Product>Smart Home Relay</Product>
     <Company>Smart Home Relay</Company>
     <Copyright>Copyright © 2026</Copyright>

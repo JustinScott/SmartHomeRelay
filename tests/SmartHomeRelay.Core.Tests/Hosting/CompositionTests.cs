@@ -31,6 +31,7 @@ public sealed class CompositionTests : IDisposable
         services.AddSingleton<IAppPaths>(_paths);
         services.AddSingleton<IHostNameProvider>(new FakeHostNameProvider("TEST-PC"));
         services.AddSingleton<IShellLauncher>(new FakeShellLauncher());
+        services.AddSingleton<ISettingsWindow>(new FakeSettingsWindow());
         services.AddSingleton<IUserNotifier>(new FakeUserNotifier());
         services.AddSingleton<ISecretProtector>(new FakeSecretProtector());
         services.AddSingleton<ISystemEventSource>(new FakeSystemEventSource());
