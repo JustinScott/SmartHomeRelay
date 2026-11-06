@@ -75,3 +75,7 @@ dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj -c Release -r wi
 - [docs/media-player.md](docs/media-player.md): installing the MQTT Media Player add-on for the media player
 - [docs/notifications.md](docs/notifications.md): sending notifications to the PC from Home Assistant
 - `tools/probe-sensors.ps1`: lists which temperature and power sources a PC exposes to a standard user
+
+## License
+
+[MIT](LICENSE). Use it, change it, and share it; fixes and additions are welcome as pull requests.
