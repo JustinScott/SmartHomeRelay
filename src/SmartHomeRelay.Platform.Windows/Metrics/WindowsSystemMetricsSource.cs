@@ -76,7 +76,12 @@ public sealed class WindowsSystemMetricsSource : ISystemMetricsSource
     }
 
     /// <inheritdoc />
-    public IReadOnlyDictionary<string, double> GetGpuEngineUtilization() => _gpuEngines.Read();
+    /// <remarks>
+    /// Clamped to 0-100: Windows' GPU Engine counter can report more than 100% for one instance (499% seen on a CI
+    /// VM between two reads milliseconds apart), and the interface promises percentages.
+    /// </remarks>
+    public IReadOnlyDictionary<string, double> GetGpuEngineUtilization() =>
+        _gpuEngines.Read().ToDictionary(e => e.Key, e => Math.Clamp(e.Value, 0, 100), StringComparer.Ordinal);
 
     /// <inheritdoc />
     public IReadOnlyList<string> GetEnergyMeterInstances() => _energyMeter.GetInstanceNames();
