@@ -44,7 +44,11 @@ public static class DiscoveryPayloadBuilder
             json.WriteString("unique_id", UniqueIds.For(device.Id, entity.Key));
             json.WriteBoolean("has_entity_name", true);
 
-            if (entity.AvailableWhen is { } availability)
+            if (entity.ReportsConnection)
+            {
+                // No availability: the entity reads the availability topic itself and shows off while offline.
+            }
+            else if (entity.AvailableWhen is { } availability)
             {
                 WriteAvailabilityList(json, topics, availability);
             }
@@ -57,7 +61,7 @@ public static class DiscoveryPayloadBuilder
 
             if (entity.HasState)
             {
-                json.WriteString("state_topic", topics.State(entity.Key));
+                json.WriteString("state_topic", entity.ReportsConnection ? topics.Availability : topics.State(entity.Key));
             }
 
             if (entity.AcceptsCommands)
@@ -146,8 +150,8 @@ public static class DiscoveryPayloadBuilder
                 json.WriteString("state_off", Off);
                 break;
             case EntityComponent.BinarySensor:
-                json.WriteString("payload_on", On);
-                json.WriteString("payload_off", Off);
+                json.WriteString("payload_on", entity.ReportsConnection ? MqttTopics.Online : On);
+                json.WriteString("payload_off", entity.ReportsConnection ? MqttTopics.Offline : Off);
                 break;
             case EntityComponent.Number when entity.Range is { } range:
                 json.WriteNumber("min", range.Min);

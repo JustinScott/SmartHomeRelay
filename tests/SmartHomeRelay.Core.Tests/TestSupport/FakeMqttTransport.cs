@@ -26,6 +26,12 @@ internal sealed class FakeMqttTransport : IMqttTransport
 
     public int DisconnectCount { get; private set; }
 
+    /// <summary>
+    /// Messages the broker keeps. A retained publish updates it (an empty one deletes); subscribing delivers the
+    /// matching ones with <see cref="MqttMessage.Retained"/> set, like a broker.
+    /// </summary>
+    public ConcurrentDictionary<string, string> Retained { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Connect attempts wait until cancelled, like an unreachable broker before its timeout.</summary>
     public bool HangConnects { get; set; }
 
@@ -71,6 +77,17 @@ internal sealed class FakeMqttTransport : IMqttTransport
 
         Calls.Enqueue($"publish {topic} {payload}");
         Publications.Enqueue(new Published(topic, payload, qos, retain));
+        if (retain)
+        {
+            if (payload.Length == 0)
+            {
+                Retained.TryRemove(topic, out _);
+            }
+            else
+            {
+                Retained[topic] = payload;
+            }
+        }
     }
 
     public Task SubscribeAsync(IReadOnlyCollection<string> topics, CancellationToken cancellationToken)
@@ -79,6 +96,14 @@ internal sealed class FakeMqttTransport : IMqttTransport
         foreach (var topic in topics)
         {
             Subscriptions.Enqueue(topic);
+        }
+
+        foreach (var (topic, payload) in Retained.ToArray())
+        {
+            if (topics.Any(filter => Matches(filter, topic)))
+            {
+                MessageReceived?.Invoke(this, new MqttMessage(topic, payload, Retained: true));
+            }
         }
 
         return Task.CompletedTask;
@@ -107,6 +132,27 @@ internal sealed class FakeMqttTransport : IMqttTransport
 
     /// <summary>Simulates a message arriving from the broker.</summary>
     public void Receive(string topic, string payload) => MessageReceived?.Invoke(this, new MqttMessage(topic, payload));
+
+    /// <summary>MQTT topic filter matching with <c>+</c> and a trailing <c>#</c>.</summary>
+    public static bool Matches(string filter, string topic)
+    {
+        var f = filter.Split('/');
+        var t = topic.Split('/');
+        for (var i = 0; i < f.Length; i++)
+        {
+            if (f[i] == "#")
+            {
+                return true;
+            }
+
+            if (i >= t.Length || (f[i] != "+" && f[i] != t[i]))
+            {
+                return false;
+            }
+        }
+
+        return f.Length == t.Length;
+    }
 
     public List<Published> PublishedTo(string topic) => [.. Publications.Where(p => p.Topic == topic)];
 

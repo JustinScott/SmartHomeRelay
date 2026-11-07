@@ -39,7 +39,7 @@ UninstallDisplayName={#AppName}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-; Close the running app before upgrading (spec 8). Uninstall stops it in [UninstallRun].
+; Close the running app before upgrading (spec 8). Uninstall stops it in [Code].
 CloseApplications=force
 RestartApplications=no
 
@@ -57,10 +57,39 @@ Root: HKCU; Subkey: "Software\Classes\AppUserModelId\{#AppUserModelId}"; ValueTy
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Start {#AppName} now"; Flags: nowait postinstall skipifsilent
 
-[UninstallRun]
-; Only this user's own copy can be stopped (no admin rights).
-Filename: "{sys}\taskkill.exe"; Parameters: "/IM {#AppExe} /F"; Flags: runhidden; RunOnceId: "StopApp"
-
 [UninstallDelete]
 ; Downloaded images and the toast icon. Settings (%APPDATA%) and logs are kept.
 Type: filesandordirs; Name: "{localappdata}\SmartHomeRelay\cache"
+
+[Code]
+// Uninstall (spec 4.4, 8): stop this user's running copy, then offer to remove the PC from Home Assistant.
+// Runs before any file is deleted, so the app is still there to do it.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  if CurUninstallStep <> usUninstall then
+    Exit;
+
+  // Only this user's own copy can be stopped (no admin rights).
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExe} /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // Never set up: nothing in Home Assistant.
+  if not FileExists(ExpandConstant('{userappdata}\SmartHomeRelay\settings.json')) then
+    Exit;
+
+  // Silent uninstalls remove it too.
+  if not UninstallSilent() then
+    if MsgBox('Also remove this PC from Home Assistant?' + #13#10#13#10 +
+              'Its device and entities are deleted there, including names, icons and areas you set. ' +
+              'Choose No if you plan to install Smart Home Relay again.',
+              mbConfirmation, MB_YESNO or MB_DEFBUTTON1) <> IDYES then
+      Exit;
+
+  // The app gives up on the broker within 20 seconds and exits 1 when nothing was removed.
+  if (not Exec(ExpandConstant('{app}\{#AppExe}'), '--remove-from-home-assistant', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+      or (ResultCode <> 0)) and not UninstallSilent() then
+    MsgBox('Smart Home Relay couldn''t reach the MQTT broker, so this PC is still in Home Assistant. ' +
+           'To remove it there: Settings > Devices & services > MQTT, open the device, then Delete.',
+           mbInformation, MB_OK);
+end;

@@ -10,6 +10,7 @@ using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Features;
 using SmartHomeRelay.Core.Features.Audio;
+using SmartHomeRelay.Core.Features.Connection;
 using SmartHomeRelay.Core.Features.Display;
 using SmartHomeRelay.Core.Features.Hardware;
 using SmartHomeRelay.Core.Features.MediaPlayer;
@@ -18,6 +19,7 @@ using SmartHomeRelay.Core.Features.Metrics;
 using SmartHomeRelay.Core.Features.Power;
 using SmartHomeRelay.Core.Features.Presence;
 using SmartHomeRelay.Core.Hosting;
+using SmartHomeRelay.Core.Mqtt;
 using SmartHomeRelay.Core.Net;
 using SmartHomeRelay.Platform.Windows;
 using SmartHomeRelay.Platform.Windows.Audio;
@@ -36,14 +38,25 @@ namespace SmartHomeRelay.App;
 /// <summary>Entry point and composition root (spec 3.2). Wiring only; no business logic.</summary>
 internal static class Program
 {
+    /// <summary>Run by the uninstaller: remove this PC from Home Assistant and exit, with no window (spec 4.4, 8).</summary>
+    private const string RemoveArgument = "--remove-from-home-assistant";
+
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan s_removalTimeout = TimeSpan.FromSeconds(20);
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
+        var removeOnly = args.Contains(RemoveArgument, StringComparer.OrdinalIgnoreCase);
         using var singleInstance = new SingleInstanceGuard();
         if (!singleInstance.TryAcquire())
         {
+            if (removeOnly)
+            {
+                // The running copy would announce everything again.
+                return RemovalExitCodes.AlreadyRunning;
+            }
+
             // The running copy shows a tray balloon in response.
             singleInstance.SignalPrimaryInstance();
             return 0;
@@ -69,6 +82,7 @@ internal static class Program
         builder.Services.AddHostedService<LogLevelSynchronizer>();
         builder.Services.AddRelayMqtt();
         builder.Services.AddSingleton<TrayApplicationContext>();
+        builder.Services.AddSingleton<RemovalRequest>();
 
         // Settings window and start with Windows (spec 7.1)
         builder.Services.AddSingleton<SettingsWindowOpener>();
@@ -79,6 +93,9 @@ internal static class Program
         builder.Services.AddHostedService<StartWithWindowsSynchronizer>();
 
         // Feature modules (spec 13): the module plus its platform implementations.
+        // Connected (spec 4.3)
+        builder.Services.AddSingleton<IFeatureModule, ConnectionModule>();
+
         // Presence (spec 5.1)
         builder.Services.AddSingleton<IIdleTimeProvider, WindowsIdleTimeProvider>();
         builder.Services.AddSingleton<ISessionStateProvider, WindowsSessionStateProvider>();
@@ -121,6 +138,13 @@ internal static class Program
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SmartHomeRelay.App");
         UnhandledExceptionLogging.Register(logger);
 
+        if (removeOnly)
+        {
+            return RemoveFromHomeAssistant(host.Services, logger).Outcome == RemovalOutcome.Failed
+                ? RemovalExitCodes.Failed
+                : RemovalExitCodes.Done;
+        }
+
         try
         {
             AppLog.Starting(logger, typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown");
@@ -142,7 +166,55 @@ internal static class Program
         finally
         {
             Task.Run(() => host.StopAsync(s_shutdownTimeout)).GetAwaiter().GetResult();
+
+            // Tray menu → Remove from Home Assistant: only after our own connection has said goodbye.
+            if (host.Services.GetRequiredService<RemovalRequest>().Requested)
+            {
+                var result = RemoveFromHomeAssistant(host.Services, logger);
+                MessageBox.Show(result.Message, "Smart Home Relay", MessageBoxButtons.OK, result.Outcome == RemovalOutcome.Failed ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            }
+
             AppLog.Stopped(logger);
         }
     }
+
+    /// <summary>Reads the settings and clears what this PC left on the broker. Never throws for broker problems.</summary>
+    private static RemovalResult RemoveFromHomeAssistant(IServiceProvider services, ILogger logger)
+    {
+        // Same thread-pool bridge as above. The host isn't started in remove-only mode, so read the settings once.
+        return Task.Run(async () =>
+        {
+            var state = services.GetRequiredService<SettingsState>();
+            await state.StartAsync(CancellationToken.None).ConfigureAwait(false);
+            using var timeout = new CancellationTokenSource(s_removalTimeout);
+            try
+            {
+                return await services.GetRequiredService<HomeAssistantRemover>().RemoveAsync(state.Current.Settings, timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                AppLog.RemovalTimedOut(logger);
+                return new RemovalResult(RemovalOutcome.Failed, 0, "The MQTT broker didn't answer in time, so this PC may still be in Home Assistant.");
+            }
+        }).GetAwaiter().GetResult();
+    }
+}
+
+/// <summary>Exit codes of <c>--remove-from-home-assistant</c>, read by the uninstaller.</summary>
+internal static class RemovalExitCodes
+{
+    /// <summary>Removed, or nothing was set up.</summary>
+    public const int Done = 0;
+
+    /// <summary>The broker couldn't be reached or refused, or the settings can't be used.</summary>
+    public const int Failed = 1;
+
+    /// <summary>Smart Home Relay is running, so nothing was done.</summary>
+    public const int AlreadyRunning = 2;
+}
+
+/// <summary>Set by the tray menu: remove this PC from Home Assistant once the app has stopped (spec 4.4).</summary>
+internal sealed class RemovalRequest
+{
+    public bool Requested { get; set; }
 }

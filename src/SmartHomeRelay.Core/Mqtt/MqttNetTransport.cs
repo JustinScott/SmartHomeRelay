@@ -59,7 +59,7 @@ public sealed class MqttNetTransport : IMqttTransport
             .WithTimeout(options.ConnectTimeout)
             .WithWillTopic(options.WillTopic)
             .WithWillPayload(options.WillPayload)
-            .WithWillRetain()
+            .WithWillRetain(options.WillRetain)
             .WithWillQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce);
 
         if (!string.IsNullOrEmpty(options.Username))
@@ -173,7 +173,7 @@ public sealed class MqttNetTransport : IMqttTransport
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
     {
         var message = e.ApplicationMessage;
-        MessageReceived?.Invoke(this, new MqttMessage(message.Topic, message.ConvertPayloadToString() ?? string.Empty));
+        MessageReceived?.Invoke(this, new MqttMessage(message.Topic, message.ConvertPayloadToString() ?? string.Empty, message.Retain));
         return Task.CompletedTask;
     }
 

@@ -43,6 +43,11 @@ public static class EntityValidator
                 errors.Add($"Entity '{entity.Key}' is a {entity.Component} and cannot have a command topic.");
             }
 
+            if (entity.ReportsConnection && (entity.Component != EntityComponent.BinarySensor || entity.AvailableWhen is not null))
+            {
+                errors.Add($"Entity '{entity.Key}' reports the connection, so it must be a BinarySensor with no availability condition.");
+            }
+
             if (entity.Component == EntityComponent.Number && entity.Range is null)
             {
                 errors.Add($"Entity '{entity.Key}' is a Number but has no range.");

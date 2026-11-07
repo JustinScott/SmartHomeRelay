@@ -1,0 +1,22 @@
+{
+  "name": "Connected",
+  "unique_id": "desktop_abc123_connected",
+  "has_entity_name": true,
+  "state_topic": "shr/DESKTOP-ABC123/status",
+  "payload_on": "online",
+  "payload_off": "offline",
+  "device_class": "connectivity",
+  "device": {
+    "identifiers": [
+      "DESKTOP-ABC123"
+    ],
+    "name": "Desk PC",
+    "manufacturer": "Smart Home Relay",
+    "model": "Windows PC",
+    "sw_version": "1.2.3"
+  },
+  "origin": {
+    "name": "Smart Home Relay",
+    "sw_version": "1.2.3"
+  }
+}

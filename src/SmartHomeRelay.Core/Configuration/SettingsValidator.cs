@@ -89,13 +89,17 @@ public sealed class SettingsValidator
         ValidateTopic("mqtt.baseTopic", mqtt.BaseTopic, errors);
     }
 
+    /// <summary>True if <paramref name="id"/> is non-empty and only letters, digits, <c>-</c>, and <c>_</c>.</summary>
+    public static bool IsValidDeviceId(string id) =>
+        !string.IsNullOrEmpty(id) && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
     private static void ValidateDevice(DeviceSettings device, List<string> errors)
     {
         if (string.IsNullOrWhiteSpace(device.Id))
         {
             errors.Add("device.id is required.");
         }
-        else if (!device.Id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+        else if (!IsValidDeviceId(device.Id))
         {
             // The ID is a topic level and the node_id in HA discovery topics, which HA restricts to
             // [a-zA-Z0-9_-]. Windows host names already fit.

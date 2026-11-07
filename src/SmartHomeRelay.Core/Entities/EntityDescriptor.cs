@@ -38,6 +38,13 @@ public sealed record EntityDescriptor(string Key, string Name, EntityComponent C
     /// <summary>Optional extra availability condition; null means available whenever the device is online.</summary>
     public EntityAvailability? AvailableWhen { get; init; }
 
+    /// <summary>
+    /// A binary sensor whose state is the device's own availability topic (<c>online</c>/<c>offline</c>), with no
+    /// availability of its own, so HA shows it <c>off</c> rather than unavailable while the PC is offline (spec 4.3).
+    /// Its state is never published by a module.
+    /// </summary>
+    public bool ReportsConnection { get; init; }
+
     /// <summary>Whether state messages are retained (sensors yes; spec 4.3).</summary>
     public bool RetainState { get; init; } = true;
 

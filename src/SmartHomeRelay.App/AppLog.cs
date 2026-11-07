@@ -20,6 +20,9 @@ internal static partial class AppLog
     [LoggerMessage(Level = LogLevel.Critical, Message = "Unhandled exception (terminating: {IsTerminating})")]
     public static partial void UnhandledDomainException(ILogger logger, Exception? exception, bool isTerminating);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Remove from Home Assistant timed out")]
+    public static partial void RemovalTimedOut(ILogger logger);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Unobserved task exception")]
     public static partial void UnobservedTaskException(ILogger logger, Exception exception);
 }

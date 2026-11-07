@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using SmartHomeRelay.App.Settings;
 using SmartHomeRelay.Core.Abstractions;
+using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Hosting;
 using SmartHomeRelay.Core.Mqtt;
 
@@ -24,6 +25,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly TrayNotifier _notifier;
     private readonly SettingsWindowOpener _settingsOpener;
     private readonly Func<SettingsForm> _createSettingsForm;
+    private readonly ISettingsState _settings;
+    private readonly RemovalRequest _removal;
     private readonly SynchronizationContext _uiContext;
     private readonly CancellationTokenRegistration _stoppingRegistration;
     private readonly Dictionary<StatusSeverity, Icon> _icons;
@@ -41,8 +44,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         IHostApplicationLifetime lifetime,
         TrayNotifier notifier,
         SettingsWindowOpener settingsOpener,
-        Func<SettingsForm> createSettingsForm)
+        Func<SettingsForm> createSettingsForm,
+        ISettingsState settings,
+        RemovalRequest removal)
     {
+        _settings = settings;
+        _removal = removal;
         _settingsOpener = settingsOpener;
         _createSettingsForm = createSettingsForm;
         _status = status;
@@ -65,6 +72,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _menu.Items.Add("Settings", null, (_, _) => OpenSettings());
         _menu.Items.Add("Reconnect", null, (_, _) => _reconnect.RequestReconnect());
         _menu.Items.Add("Open logs folder", null, (_, _) => _shell.OpenFolder(_paths.LogsDirectory));
+        _menu.Items.Add("Remove from Home Assistant…", null, (_, _) => ConfirmRemoval());
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add("Exit", null, (_, _) => _lifetime.StopApplication());
 
@@ -136,6 +144,26 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _settingsForm = form;
         form.Show();
         form.Activate();
+    }
+
+    /// <summary>Spec 4.4: asks, then exits; Program removes the PC once the connection is closed. UI thread only.</summary>
+    private void ConfirmRemoval()
+    {
+        var id = _settings.Current.Settings.Device.Id;
+        var answer = MessageBox.Show(
+            $"Remove {id} from Home Assistant?\n\n"
+            + "Its device and entities are deleted there, including names, icons and areas you set. "
+            + $"{AppName} then closes.\n\n"
+            + $"It adds the PC again the next time it starts. To keep it removed, turn off Start with Windows or uninstall {AppName}.",
+            AppName,
+            MessageBoxButtons.OKCancel,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+        if (answer == DialogResult.OK)
+        {
+            _removal.Requested = true;
+            _lifetime.StopApplication();
+        }
     }
 
     private void OnStatusChanged(object? sender, EventArgs e) => _uiContext.Post(_ => UpdateStatus(), null);

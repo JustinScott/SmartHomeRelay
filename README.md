@@ -12,6 +12,7 @@ It runs as a standard user and never asks for administrator rights.
 
 | Feature | Home Assistant entities | Spec |
 |---|---|---|
+| Connection | Connected: on while the app is connected, off while the PC is asleep, off, or the app is closed | [4.3](spec.md#43-behavior) |
 | Presence | Presence state, session locked, user active, idle time, signed-in user | [5.1](spec.md#51-presence) |
 | Power | Shutdown, restart, cancel shutdown, sleep, hibernate, lock, sign out; last boot, uptime | [5.2](spec.md#52-power) |
 | Metrics | CPU, memory, disk, network, GPU usage; CPU power; GPU temperature and power level | [5.5](spec.md#55-system-metrics) |
@@ -37,7 +38,7 @@ Shutdown, restart, hibernate and sign out are off until you allow them in the se
 
 The tray icon shows the connection state. Its menu has **Status**, **Settings** (or double-click the icon), **Reconnect**, **Open logs folder** and **Exit**. Smart Home Relay starts when you sign in; turn that off under **General** in the settings window. Rare options (MQTT topics, download limits, the hardware sensor list) are in `%APPDATA%\SmartHomeRelay\settings.json`; **General → Open settings.json** opens it.
 
-**Upgrading:** run the newer installer; it closes the app, keeps your settings, and you start it again from the last page. **Uninstalling:** Settings → Apps in Windows. Your settings and logs are kept (delete `%APPDATA%\SmartHomeRelay` and `%LOCALAPPDATA%\SmartHomeRelay` to remove them too).
+**Upgrading:** run the newer installer; it closes the app, keeps your settings, and you start it again from the last page. **Uninstalling:** Settings → Apps in Windows. It offers to remove the PC from Home Assistant too (its device and entities); to do that without uninstalling, use **Remove from Home Assistant…** in the tray menu. Your settings and logs are kept (delete `%APPDATA%\SmartHomeRelay` and `%LOCALAPPDATA%\SmartHomeRelay` to remove them too).
 
 Optional: [hardware sensors with LibreHardwareMonitor](docs/hardware-sensors.md) (CPU temperature, fans) and the [media player](docs/media-player.md) (text-to-speech and media on the PC).
 

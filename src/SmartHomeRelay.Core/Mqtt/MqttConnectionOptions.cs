@@ -27,6 +27,9 @@ public sealed class MqttConnectionOptions
     /// <summary>Last-will payload: <c>offline</c>, retained, QoS 1.</summary>
     public string WillPayload { get; init; } = MqttTopics.Offline;
 
+    /// <summary>Whether the broker keeps the last will. True for the availability topic.</summary>
+    public bool WillRetain { get; init; } = true;
+
     /// <summary>MQTT keep-alive interval.</summary>
     public TimeSpan KeepAlive { get; init; } = TimeSpan.FromSeconds(30);
 

@@ -22,6 +22,12 @@ public static class RelayServiceCollectionExtensions
         services.AddSingleton(sp => new MqttConnectionTester(() => new MqttNetTransport(), sp.GetRequiredService<Abstractions.ISecretProtector>()));
         services.AddSingleton(_ => new ReconnectBackoff(new Random()));
 
+        // Remove from Home Assistant (spec 4.4): its own short-lived connection, like Test connection.
+        services.AddSingleton(sp => new HomeAssistantRemover(
+            () => new MqttNetTransport(),
+            sp.GetRequiredService<Abstractions.ISecretProtector>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<HomeAssistantRemover>>()));
+
         services.AddSingleton<ModuleHost>();
         services.AddSingleton<IMqttSessionHandler>(sp => sp.GetRequiredService<ModuleHost>());
 
