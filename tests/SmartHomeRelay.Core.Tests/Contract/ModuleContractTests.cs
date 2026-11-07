@@ -34,7 +34,7 @@ public sealed class ModuleContractTests
                 settings, new FakeMediaSession(), new FakeAudioController(), new FakeAnnouncementPlayer(), new FakeAudioDucker(), new FakeHttpDownloader(), new FakeToastPresenter(), TimeProvider.System),
             new SmartHomeRelay.Core.Features.Notifications.NotificationsModule(
                 settings, new FakeToastPresenter(), new FakeHttpDownloader(), new TempAppPaths(), TimeProvider.System),
-            new SmartHomeRelay.Core.Features.Connection.ConnectionModule(),
+            new SmartHomeRelay.Core.Features.DeviceInfo.DeviceInfoModule(),
         ];
     }
 
@@ -83,8 +83,8 @@ public sealed class ModuleContractTests
         allOff.Features.Hardware.Enabled = false;
         allOff.Features.MediaPlayer.Enabled = false;
 
-        // Except Connected (spec 4.3): it is the device's own status, not a feature.
-        foreach (var module in AllModules().Where(m => m is not SmartHomeRelay.Core.Features.Connection.ConnectionModule))
+        // Except device info (spec 4.3): the device's own status and version, not a feature.
+        foreach (var module in AllModules().Where(m => m is not SmartHomeRelay.Core.Features.DeviceInfo.DeviceInfoModule))
         {
             module.IsEnabled(allOff).ShouldBeFalse(module.Id);
         }

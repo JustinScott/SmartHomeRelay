@@ -224,6 +224,15 @@ internal sealed class SettingsForm : Form
         links.Controls.Add(openLogs);
         Row(grid, string.Empty, links);
 
+        var version = RelayVersion.Describe(startup.IsInstalled);
+        var versionText = new TextBox { Text = version, ReadOnly = true, BorderStyle = BorderStyle.None, Width = 320, Margin = new Padding(0, 6, 8, 0) };
+        var copy = new Button { Text = "Copy", AutoSize = true };
+        copy.Click += (_, _) => Clipboard.SetText(version);
+        var versionRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 12, 0, 0) };
+        versionRow.Controls.Add(versionText);
+        versionRow.Controls.Add(copy);
+        Row(grid, "Version", versionRow);
+
         var advanced = Note();
         advanced.Text = "Other options (MQTT topics, download limits, hardware sensor list and overrides) are in settings.json. "
             + "Saving here keeps them, but removes comments from the file.";

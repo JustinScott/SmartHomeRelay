@@ -10,7 +10,7 @@ using SmartHomeRelay.Core.Abstractions;
 using SmartHomeRelay.Core.Configuration;
 using SmartHomeRelay.Core.Features;
 using SmartHomeRelay.Core.Features.Audio;
-using SmartHomeRelay.Core.Features.Connection;
+using SmartHomeRelay.Core.Features.DeviceInfo;
 using SmartHomeRelay.Core.Features.Display;
 using SmartHomeRelay.Core.Features.Hardware;
 using SmartHomeRelay.Core.Features.MediaPlayer;
@@ -93,8 +93,8 @@ internal static class Program
         builder.Services.AddHostedService<StartWithWindowsSynchronizer>();
 
         // Feature modules (spec 13): the module plus its platform implementations.
-        // Connected (spec 4.3)
-        builder.Services.AddSingleton<IFeatureModule, ConnectionModule>();
+        // Connected and Version (spec 4.3)
+        builder.Services.AddSingleton<IFeatureModule, DeviceInfoModule>();
 
         // Presence (spec 5.1)
         builder.Services.AddSingleton<IIdleTimeProvider, WindowsIdleTimeProvider>();
@@ -147,7 +147,7 @@ internal static class Program
 
         try
         {
-            AppLog.Starting(logger, typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown");
+            AppLog.Starting(logger, RelayVersion.Describe(host.Services.GetRequiredService<IStartupRegistration>().IsInstalled));
 
             // Main must stay synchronous to keep this thread STA for WinForms. Running the async host
             // calls on the thread pool means no UI synchronization context is captured, so this

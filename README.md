@@ -12,7 +12,7 @@ It runs as a standard user and never asks for administrator rights.
 
 | Feature | Home Assistant entities | Spec |
 |---|---|---|
-| Connection | Connected: on while the app is connected, off while the PC is asleep, off, or the app is closed | [4.3](spec.md#43-behavior) |
+| Device info | Connected (off while the PC is asleep, off, or the app is closed); Version of the running build | [4.3](spec.md#43-behavior) |
 | Presence | Presence state, session locked, user active, idle time, signed-in user | [5.1](spec.md#51-presence) |
 | Power | Shutdown, restart, cancel shutdown, sleep, hibernate, lock, sign out; last boot, uptime | [5.2](spec.md#52-power) |
 | Metrics | CPU, memory, disk, network, GPU usage; CPU power; GPU temperature and power level | [5.5](spec.md#55-system-metrics) |

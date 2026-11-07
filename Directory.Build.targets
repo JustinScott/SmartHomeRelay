@@ -1,0 +1,37 @@
+<Project>
+  <!-- Spec 8: every build says which code it is. A release (the commit tagged v$(Version), with no local changes,
+       or CI building that tag) is plain "1.0.0"; anything else is "1.0.0-dev+<commit>", plus ".modified" when the
+       working tree has uncommitted changes. The app shows it in the tray and settings window, and Home Assistant
+       as the device's software version and the Version sensor. Without git it is "1.0.0-dev". -->
+  <PropertyGroup>
+    <!-- We add the commit ourselves, shortened. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <Target Name="SetRelayInformationalVersion" BeforeTargets="GetAssemblyVersion">
+    <Exec Command="git rev-parse --short=7 HEAD" WorkingDirectory="$(MSBuildThisFileDirectory)" ConsoleToMSBuild="true"
+          IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" EchoOff="true"
+          StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_RelayCommit" />
+      <Output TaskParameter="ExitCode" PropertyName="_RelayGitExit" />
+    </Exec>
+    <Exec Condition="'$(_RelayGitExit)' == '0'" Command="git status --porcelain --untracked-files=no" WorkingDirectory="$(MSBuildThisFileDirectory)"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" EchoOff="true"
+          StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_RelayChanges" />
+    </Exec>
+    <Exec Condition="'$(_RelayGitExit)' == '0'" Command="git tag --points-at HEAD" WorkingDirectory="$(MSBuildThisFileDirectory)"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" EchoOff="true"
+          StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_RelayTags" />
+    </Exec>
+
+    <PropertyGroup>
+      <_RelayIsRelease Condition="'$(_RelayGitExit)' == '0' and '$(_RelayChanges)' == '' and ('$(GITHUB_REF)' == 'refs/tags/v$(Version)' or $([System.String]::Copy(';$(_RelayTags);').Contains(';v$(Version);')))">true</_RelayIsRelease>
+      <_RelayBuild Condition="'$(_RelayGitExit)' == '0'">+$(_RelayCommit)</_RelayBuild>
+      <_RelayBuild Condition="'$(_RelayGitExit)' == '0' and '$(_RelayChanges)' != ''">$(_RelayBuild).modified</_RelayBuild>
+      <InformationalVersion Condition="'$(_RelayIsRelease)' == 'true'">$(Version)</InformationalVersion>
+      <InformationalVersion Condition="'$(_RelayIsRelease)' != 'true'">$(Version)-dev$(_RelayBuild)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+</Project>

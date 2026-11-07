@@ -27,6 +27,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly Func<SettingsForm> _createSettingsForm;
     private readonly ISettingsState _settings;
     private readonly RemovalRequest _removal;
+    private readonly string _version;
     private readonly SynchronizationContext _uiContext;
     private readonly CancellationTokenRegistration _stoppingRegistration;
     private readonly Dictionary<StatusSeverity, Icon> _icons;
@@ -46,8 +47,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         SettingsWindowOpener settingsOpener,
         Func<SettingsForm> createSettingsForm,
         ISettingsState settings,
-        RemovalRequest removal)
+        RemovalRequest removal,
+        IStartupRegistration startup)
     {
+        _version = RelayVersion.Describe(startup.IsInstalled);
         _settings = settings;
         _removal = removal;
         _settingsOpener = settingsOpener;
@@ -67,6 +70,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _statusItem = new ToolStripMenuItem { Enabled = false };
         _menu.Items.Add(_statusItem);
+        _menu.Items.Add($"Version {_version}", null, (_, _) => CopyVersion()).ToolTipText = "Click to copy";
         _menu.Items.Add(new ToolStripSeparator());
 
         _menu.Items.Add("Settings", null, (_, _) => OpenSettings());
@@ -146,6 +150,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         form.Activate();
     }
 
+    private void CopyVersion()
+    {
+        Clipboard.SetText(_version);
+        ShowBalloon(AppName, $"Version copied: {_version}");
+    }
+
     /// <summary>Spec 4.4: asks, then exits; Program removes the PC once the connection is closed. UI thread only.</summary>
     private void ConfirmRemoval()
     {
@@ -179,7 +189,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var status = _status.Status;
         var text = RelayStatusDescriber.Describe(status);
         _statusItem.Text = $"Status: {text}";
-        _notifyIcon.Text = $"{AppName}: {text}";
+        // Windows cuts tray tooltips at 127 characters (WinForms throws beyond that).
+        var tooltip = $"{AppName} {_version}\n{text}";
+        _notifyIcon.Text = tooltip.Length <= 127 ? tooltip : tooltip[..126] + "…";
         _notifyIcon.Icon = _icons[RelayStatusDescriber.Severity(status)];
     }
 }
