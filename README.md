@@ -54,19 +54,6 @@ dotnet test SmartHomeRelay.sln --filter "Category=MqttBroker"
 2. Adds the Windows-only integration tests.
 3. Needs a Mosquitto broker. `tests/brokers/start-test-brokers.sh` starts the two test brokers on Linux; CI runs these in a Linux job.
 
-## Releasing
-
-1. Set the new version in `Directory.Build.props` (it flows to the app, the installer and Home Assistant's software version) and commit.
-2. Tag the commit and push the tag: `git tag v1.0.1` then `git push origin v1.0.1`.
-3. CI builds and tests as usual, then publishes a GitHub Release with the installer. It refuses a tag that doesn't match the version.
-
-Every CI run also uploads the installer as an artifact. To build it locally: install [Inno Setup 6](https://jrsoftware.org/isinfo.php), then
-
-```
-dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj -c Release -r win-x64 --self-contained -o publish
-"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 installer\SmartHomeRelay.iss
-```
-
 ## Documentation
 
 - [spec.md](spec.md): the source of truth for behavior, topics, settings and milestones
@@ -74,7 +61,6 @@ dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj -c Release -r wi
 - [docs/hardware-sensors.md](docs/hardware-sensors.md): installing LibreHardwareMonitor for hardware sensors
 - [docs/media-player.md](docs/media-player.md): installing the MQTT Media Player add-on for the media player
 - [docs/notifications.md](docs/notifications.md): sending notifications to the PC from Home Assistant
-- `tools/probe-sensors.ps1`: lists which temperature and power sources a PC exposes to a standard user
 
 ## License
 

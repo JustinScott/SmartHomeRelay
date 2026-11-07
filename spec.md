@@ -365,7 +365,7 @@ Implementation details (milestone 5):
   - **GPU temperature and power level** come from `D3DKMTQueryAdapterInfo(KMTQAITYPE_ADAPTERPERFDATA)` per adapter (tenths of °C and tenths of a percent). One card can appear under several adapter IDs and software adapters report nothing, so the highest reported value is used. Temperature is published as whole °C when it moves at least 2 °C; power level uses the percent deadband.
   - **Drive entities** are the fixed drives present at startup; GPU usage, CPU power, GPU temperature, and GPU power level are offered only if Windows reports them at startup. Changes take effect after an app restart.
   - **Timing:** memory and disk are published at start, CPU/CPU power/network/GPU 2 seconds later (they need two samples), then everything every `intervalSeconds` (re-read each time, so a change applies on the next sample). Sampling pauses during sleep and rate baselines restart on wake.
-- **No elevation (v1):** the app runs as a standard user and never requests administrator rights. The app never reads anything that needs admin access or a kernel driver itself: notably **CPU temperature** (Windows only exposes ACPI thermal zones, which are fake on many desktops, e.g. 16.9 °C on BOX1), fan speeds, and motherboard sensors. Those come from a user-managed LibreHardwareMonitor through the Hardware feature (5.8). Only metrics available to a standard user are implemented; `tools/probe-sensors.ps1` shows what a given PC exposes.
+- **No elevation (v1):** the app runs as a standard user and never requests administrator rights. The app never reads anything that needs admin access or a kernel driver itself: notably **CPU temperature** (Windows only exposes ACPI thermal zones, which are fake on many desktops, e.g. 16.9 °C on BOX1), fan speeds, and motherboard sensors. Those come from a user-managed LibreHardwareMonitor through the Hardware feature (5.8). Only metrics available to a standard user are implemented.
 
 ### 5.6 Notifications
 
@@ -584,6 +584,17 @@ Notes:
 - **Upgrades (v1):** running a newer installer upgrades in place; the app is closed first (installer uses a `CloseApplications` mechanism). Settings in `%APPDATA%` are preserved.
 - Version is defined once in `Directory.Build.props` and flows to the assembly, installer, and HA `sw_version`.
 - **Manual updates only.** Every CI run builds the installer (Inno Setup 6 on the Windows runner) as an artifact; pushing a tag `v{version}` that matches `Directory.Build.props` also creates a GitHub Release with it (the release job refuses a mismatched tag). Updating means downloading and running the newer installer. First release: 1.0.0. Auto-update is out of scope (if wanted later, evaluate Velopack).
+- **Releasing (maintainer only; not in the README):**
+   1. Set the new version in `Directory.Build.props` (it flows to the app, the installer and Home Assistant's software version) and commit.
+   2. Tag the commit and push the tag: `git tag v1.0.1` then `git push origin v1.0.1`.
+   3. CI builds and tests as usual, then publishes a GitHub Release with the installer. It refuses a tag that doesn't match the version.
+
+   Every CI run also uploads the installer as an artifact. To build it locally, install [Inno Setup 6](https://jrsoftware.org/isinfo.php). Then:
+
+   ```
+   dotnet publish src/SmartHomeRelay.App/SmartHomeRelay.App.csproj -c Release -r win-x64 --self-contained -o publish
+   "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 installer\SmartHomeRelay.iss
+   ```
 
 ---
 
@@ -723,7 +734,7 @@ Conventions:
 - Verified on the real broker and HA (milestone 4): sleep/wake, lock/unlock, and a Home Assistant restart (the app republishes status, discovery, and state).
 - Verified on BOX1 (milestone 5): Lock, Sleep (true sleep), Shutdown with the 60s Windows countdown, Cancel shutdown, and the allowShutdown setting taking effect without a restart.
 - Verified on BOX1 (milestone 6): CPU, memory, disk, and GPU match Task Manager. Network is an average over the sample interval, so it is smoother than Task Manager's 1-second view; accepted as is.
-- Added after milestone 6, verified with `tools/probe-sensors.ps1` on BOX1 (Ryzen 7 5800X3D, AMD GPU) as a standard user: `cpu_power` (Energy Meter), `gpu_temperature` and `gpu_power_level` (D3DKMT adapter perf data). CPU temperature is not available without a driver.
+- Added after milestone 6, verified with a one-off probe script (`tools/probe-sensors.ps1`, removed after 1.0; it is in the git history) on BOX1 (Ryzen 7 5800X3D, AMD GPU) as a standard user: `cpu_power` (Energy Meter), `gpu_temperature` and `gpu_power_level` (D3DKMT adapter perf data). CPU temperature is not available without a driver.
 - Hardware sensors (CPU temperature, fans) come from a LibreHardwareMonitor the user installs and manages, read through its local web server (5.8). Chosen over a bundled elevated sensor service: no elevation, driver, or new packages in the app, and all sensors stay on one HA device. Use this feature or HA's LHM integration, not both. Moved into milestone 6 so all metrics are settled before milestone 7.
 - Verified on BOX1 (hardware sensors, LHM 0.9.6 with PawnIO): `hardware_status` is `ok`, so the anti-spoofing checks pass against the real LHM; CPU and SSD temperatures map by rule. BOX1's Gigabyte board (ITE IT8688E) names its fans "Fan #1".."Fan #5", so `cpu_fan` needs a `sensorOverrides` entry, as designed (the rules never guess). Its real `data.json` is a test fixture.
 - Verified on BOX1 (milestone 6 complete): CPU, memory, disk, network and GPU usage match Task Manager; CPU power, GPU temperature and GPU power level appear; hardware sensors from LHM 0.9.6 read `ok` with plausible values (CPU fan via `sensorOverrides`); Windows tests pass on BOX1 and in CI (run #10, after fixing the protected-folder check that failed when tests ran elevated).
